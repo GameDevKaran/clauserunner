@@ -1,0 +1,5 @@
+/* Base custom styles if needed, Tailwind is loaded via CDN */
+body {
+  margin: 0;
+  font-family: Inter, sans-serif;
+}
