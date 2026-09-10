@@ -18,6 +18,7 @@ This document maps the major ClauseRunner product features and technical claims 
 - **Technical Proof**:
   - `backend/agent/strands_agent.py` instantiates `strands.models.BedrockModel` using the unpacked model configuration (`model_id` / Claude 3.5 Sonnet on AWS Bedrock).
   - Uses `boto3` client checks (`client = boto3.client("bedrock", region_name=region)`) inside `is_bedrock_available()` to verify live access.
+  - **OIDC/Authorization Status**: Bedrock integration and AgentCore runtimes are fully coded and prepared, but currently marked as **PENDING AWS account authorization** (`authorizationStatus=NOT_AUTHORIZED`). In this pending state, ClauseRunner gracefully degrades to our deterministic **Local Mock Mode**, running all contract agentic loops, state machine changes, human-in-the-loop approvals, and audit events successfully.
 
 ---
 

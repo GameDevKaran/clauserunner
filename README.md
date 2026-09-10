@@ -72,7 +72,7 @@ BEDROCK_MODEL_ID=us.anthropic.claude-3-5-sonnet-20241022-v2:0
 CLAUSERUNNER_S3_BUCKET=
 CLAUSERUNNER_DYNAMODB_TABLE=
 ```
-*Note: If AWS Bedrock credentials are not present, ClauseRunner automatically runs in a fully functional **Local Mock Mode**, running local agentic loops on SQLite without failing.*
+*Note: AWS Bedrock Claude 3.5 model integration and AgentCore runtimes are fully coded and prepared, but currently pending AWS account authorization (NOT_AUTHORIZED). If authorization is pending, ClauseRunner automatically degrades gracefully to a fully functional and deterministic **Local Mock Mode**, running all contract agentic loops, state machine changes, human-in-the-loop approvals, and audit events successfully.*
 
 ---
 
