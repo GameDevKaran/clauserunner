@@ -8,7 +8,7 @@
 
 Once a contract is signed, it is often archived as a passive PDF. Critical operational obligations—such as monthly service level commitments (SLAs), automatic renewal notice windows, and SOC 2 submissions—are left unmonitored. 
 
-**ClauseRunner turns contracts into active operational code.** It persistently monitors compliance evidence, conducts autonomous investigations using Claude 3.5 Sonnet on AWS Bedrock via Strands, maps violations to remedies, and prepares claim packages under strict deterministic code rules.
+**ClauseRunner turns contracts into active operational code.** It persistently monitors compliance evidence, conducts autonomous investigations via Amazon Bedrock (testing with Nova 2 Lite while pending authorization) via Strands, maps violations to remedies, and prepares claim packages under strict deterministic code rules.
 
 ---
 
@@ -17,7 +17,7 @@ Once a contract is signed, it is often archived as a passive PDF. Critical opera
 ```
 Web Interface (React/Vite) ◄──► FastAPI Backend ◄──► Strands Operations Agent 
                                                        │
-                                                       ├─► Amazon Bedrock (Claude 3.5)
+                                                       ├─► Amazon Bedrock (Nova 2 Lite)
                                                        ├─► Storage Layer (SQLite/DynamoDB)
                                                        └─► Audit Trail (Immutability Ledger)
 ```
@@ -68,11 +68,11 @@ Open `http://localhost:5173` in your browser.
 Create a `.env` file in your root workspace. A safe blank `.env.example` is tracked for reference:
 ```text
 AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=us.anthropic.claude-3-5-sonnet-20241022-v2:0
+BEDROCK_MODEL_ID=us.amazon.nova-2-lite-v1:0
 CLAUSERUNNER_S3_BUCKET=
 CLAUSERUNNER_DYNAMODB_TABLE=
 ```
-*Note: AWS Bedrock Claude 3.5 model integration and AgentCore runtimes are fully coded and prepared, but currently pending AWS account authorization (NOT_AUTHORIZED). If authorization is pending, ClauseRunner automatically degrades gracefully to a fully functional and deterministic **Local Mock Mode**, running all contract agentic loops, state machine changes, human-in-the-loop approvals, and audit events successfully.*
+*Note: Amazon Bedrock integration and AgentCore runtimes are fully coded and prepared, but currently pending AWS account authorization (NOT_AUTHORIZED). We have successfully tested with the Amazon Nova 2 Lite model (amazon.nova-2-lite-v1:0 / us.amazon.nova-2-lite-v1:0) during authorization checks. Live inference is NOT currently verified since authorization is pending. In this state, ClauseRunner automatically degrades gracefully to a fully functional and deterministic **Local Mock Mode**, running all contract agentic loops, state machine changes, human-in-the-loop approvals, and audit events successfully.*
 
 ---
 
@@ -90,7 +90,7 @@ npm run build
 ---
 
 ## AWS Services Used
-- **Amazon Bedrock**: Powering the Strands Agent loop via Claude 3.5 Sonnet.
+- **Amazon Bedrock**: Powering the Strands Agent loop via Amazon Nova 2 Lite (integration prepared, live inference pending active account authorization).
 - **Amazon S3**: For storing compliance documents and uptime log evidence.
 - **Amazon DynamoDB**: Single-table design schema storing authoritative contract states and audit ledgers.
 - **Amazon EventBridge Scheduler**: Scheduled obligation checker for expiring notice deadlines.

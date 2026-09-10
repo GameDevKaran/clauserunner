@@ -16,9 +16,11 @@ This document maps the major ClauseRunner product features and technical claims 
 
 ### Claim: "Uses Amazon Bedrock"
 - **Technical Proof**:
-  - `backend/agent/strands_agent.py` instantiates `strands.models.BedrockModel` using the unpacked model configuration (`model_id` / Claude 3.5 Sonnet on AWS Bedrock).
-  - Uses `boto3` client checks (`client = boto3.client("bedrock", region_name=region)`) inside `is_bedrock_available()` to verify live access.
-  - **OIDC/Authorization Status**: Bedrock integration and AgentCore runtimes are fully coded and prepared, but currently marked as **PENDING AWS account authorization** (`authorizationStatus=NOT_AUTHORIZED`). In this pending state, ClauseRunner gracefully degrades to our deterministic **Local Mock Mode**, running all contract agentic loops, state machine changes, human-in-the-loop approvals, and audit events successfully.
+  - `backend/agent/strands_agent.py` instantiates `strands.models.BedrockModel` using the unpacked model configuration (`model_id` / Amazon Nova 2 Lite / `us.amazon.nova-2-lite-v1:0` on AWS Bedrock).
+  - Uses `boto3` client checks (`client = boto3.client("bedrock", region_name=region)`) inside `is_bedrock_available()` to check for access capability.
+  - **OIDC/Authorization Status**: Bedrock integration and AgentCore runtimes are fully coded, but are currently marked as **PENDING AWS account authorization** (`authorizationStatus=NOT_AUTHORIZED`). Live inference is NOT verified. Only successful Converse/InvokeModel calls count as live Bedrock verification.
+  - **Tested Model**: The model selected for live authorization checks and configured as the target is **Amazon Nova 2 Lite** (`amazon.nova-2-lite-v1:0` / `us.amazon.nova-2-lite-v1:0`), NOT Claude 3.5 Sonnet.
+  - **Current Runtime Behavior**: While Bedrock authorization is pending, the application runs on the hosted ECS Express Mode container using its robust, deterministic, and fully validated **Local Mock Mode**, running all contract agentic loops, state machine changes, human-in-the-loop approvals, and audit events successfully with zero failures.
 
 ---
 
