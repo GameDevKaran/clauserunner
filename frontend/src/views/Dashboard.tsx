@@ -33,12 +33,29 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: string, d?: 
 
   return (
     <div className="p-6 overflow-y-auto h-full space-y-6">
-      <div className="bg-gradient-to-r from-brand-900 to-slate-900 text-white p-6 rounded-2xl flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold mb-1">ClauseRunner Operations</h1>
-          <p className="text-slate-300 text-xs">Post-signature contract operations with deterministic execution boundaries.</p>
+      <div className="bg-gradient-to-r from-brand-900 via-slate-900 to-slate-950 text-white p-6 rounded-2xl relative overflow-hidden border border-slate-800 shadow-lg">
+        <div className="relative z-10 space-y-2">
+          <div className="flex items-center space-x-2">
+            <span className="bg-brand-500 text-white font-extrabold uppercase text-[9px] px-2 py-0.5 rounded tracking-widest">Active Demo</span>
+            <span className="text-slate-500 font-bold text-[9px]">|</span>
+            <span className="text-slate-400 text-[10px] font-semibold">Post-Signature Contract Operations Agent</span>
+          </div>
+          <h1 className="text-2xl font-extrabold tracking-tight">ClauseRunner</h1>
+          <p className="text-sm font-bold text-brand-100 max-w-2xl leading-relaxed">
+            Autonomous contract operations with human-controlled execution.
+          </p>
+          <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
+            Signed contracts become actively monitored obligations. ClauseRunner investigates compliance evidence, proposes remedies, and keeps consequential executions (like claiming SLA credits) behind human authorization.
+          </p>
+          <div className="pt-2 flex items-center space-x-2 text-xs">
+            <span className="text-slate-400">👋 Welcome Judge!</span>
+            <span className="text-slate-500">•</span>
+            <button onClick={() => onNavigate('obligation_detail', 'clauserunner-obligation-acme-sla')} className="text-brand-300 font-bold hover:underline flex items-center">
+              Click "Launch Golden SLA" below to start the demo <ArrowRight size={10} className="ml-1" />
+            </button>
+          </div>
         </div>
-        <Shield size={48} className="opacity-10" />
+        <Shield size={120} className="absolute right-[-20px] top-[-20px] text-brand-500/10 fill-brand-500/5 rotate-12 pointer-events-none" />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -99,6 +116,18 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: string, d?: 
           <button onClick={() => onNavigate('obligation_detail', 'clauserunner-obligation-acme-sla')} className="w-full py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-xs flex items-center justify-center shadow-sm">
             Launch Golden SLA <Play size={10} className="ml-1 fill-white" />
           </button>
+        </div>
+      </div>
+
+      <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-400 font-semibold space-y-2 sm:space-y-0">
+        <div>
+          Built with <span className="text-slate-600 font-bold">Strands Agents SDK</span> &amp; <span className="text-slate-600 font-bold">Amazon Web Services (AWS)</span>
+        </div>
+        <div className="flex space-x-3">
+          <span>S3: <span className="text-green-600 font-bold">Active</span></span>
+          <span>DynamoDB: <span className="text-green-600 font-bold">Active</span></span>
+          <span>EventBridge: <span className="text-green-600 font-bold">Active</span></span>
+          <span>AWS Bedrock: <span className="text-amber-600 font-bold">Pending Auth</span></span>
         </div>
       </div>
     </div>
