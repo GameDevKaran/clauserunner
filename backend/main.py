@@ -46,7 +46,7 @@ class ExecutionTrigger(BaseModel):
 @app.get("/api/health")
 def health_check() -> Dict[str, Any]:
     bedrock_ok = is_bedrock_available()
-    logger.info("Health check endpoint called", extra_fields={"bedrock_ok": bedrock_ok})
+    logger.info("Health check endpoint called", extra={"extra_fields": {"bedrock_ok": bedrock_ok}})
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
@@ -54,6 +54,7 @@ def health_check() -> Dict[str, Any]:
         "agent_mode": "strands_live_bedrock" if bedrock_ok else "strands_deterministic_mock",
         "bedrock_configured": bedrock_ok,
     }
+
 
 
 @app.get("/api/contracts", response_model=List[Contract])
@@ -86,7 +87,7 @@ def get_obligation_evidence(id: str):
 
 @app.post("/api/obligations/{id}/evidence", response_model=EvidenceArtifact)
 def upload_obligation_evidence(id: str, payload: EvidenceCreate):
-    logger.info("Evidence upload triggered", extra_fields={"obligation_id": id, "evidence_name": payload.name})
+    logger.info("Evidence upload triggered", extra={"extra_fields": {"obligation_id": id, "evidence_name": payload.name}})
     res = attach_evidence(obligation_id=id, name=payload.name, content_type=payload.content_type, file_path_or_url=payload.file_path_or_url, raw_data_summary=payload.raw_data_summary)
     if "error" in res: raise HTTPException(400, res["error"])
     return get_repo().get_evidence(res["id"])
@@ -97,7 +98,7 @@ def get_obligation_audit(id: str):
 
 @app.post("/api/obligations/{id}/investigate")
 async def trigger_investigation(id: str):
-    logger.info("Strands Agent investigation triggered", extra_fields={"obligation_id": id})
+    logger.info("Strands Agent investigation triggered", extra={"extra_fields": {"obligation_id": id}})
     res = await run_investigation(id)
     if "error" in res: raise HTTPException(400, res["error"])
     return res
@@ -168,7 +169,7 @@ from backend.services.checker import run_scheduled_check
 @app.post("/api/obligations/check-all")
 def trigger_scheduled_check():
     count = run_scheduled_check()
-
+    return {"status": "success", "checked_obligations_count": count}
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -184,5 +185,4 @@ async def custom_404_handler(request, exc):
 if os.path.exists("frontend/dist"):
     app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
 
-    return {"status": "success", "checked_obligations_count": count}
 
