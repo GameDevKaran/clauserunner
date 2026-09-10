@@ -1,0 +1,20 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 772097700032.dkr.ecr.us-east-1.amazonaws.com
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t clauserunner-web:latest .
+      - docker tag clauserunner-web:latest 772097700032.dkr.ecr.us-east-1.amazonaws.com/clauserunner-web:latest
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push 772097700032.dkr.ecr.us-east-1.amazonaws.com/clauserunner-web:latest
+      - echo Verifying ECR image...
+      - aws ecr describe-images --repository-name clauserunner-web --image-ids imageTag=latest --region us-east-1

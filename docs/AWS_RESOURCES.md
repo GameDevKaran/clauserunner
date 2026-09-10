@@ -11,6 +11,7 @@ This document details the exact resources provisioned on Amazon Web Services (AW
 | **Amazon S3 Bucket** | `clauserunner-contracts-772097700032-us-east-1` | `us-east-1` | Stores compliance documents and PDF/JSON evidence logs. | **Yes** |
 | **Amazon DynamoDB Table** | `clauserunner-state` | `us-east-1` | Single-table metadata store for active contracts, traceable clauses, operational obligations, approval request queues, and audits. | **Yes** |
 | **Amazon ECR Repository** | `clauserunner-web` | `us-east-1` | Stores the unified ClauseRunner container image (Docker) for ECS Express Mode. | **Yes** |
+| **AWS CodeBuild Project** | `clauserunner-container-build` | `us-east-1` | Runs remote, secure, and serverless container builds in AWS using CodeBuild's privileged Linux environment. | **Yes** |
 | **Amazon EventBridge Schedule** | `clauserunner-obligation-check` | `us-east-1` | Scheduled check trigger that periodically evaluates approaching notice and compliance windows. | **Yes** |
 
 ---
@@ -20,9 +21,12 @@ This document details the exact resources provisioned on Amazon Web Services (AW
 - **S3 Bucket Verification**: S3 put/get/delete and full KMS-AES256 default encryption have been successfully verified using the `clauserunner-dev` credentials.
 - **DynamoDB Single-Table**: Fully provisioned under Pay-per-Request (`PAY_PER_REQUEST`) capacity and successfully seeded with golden contracts, traceable clauses, obligations, and evidence log records.
 - **Amazon ECR Repository**: Repository `clauserunner-web` is created and verified successfully.
+- **AWS CodeBuild Project**: Project `clauserunner-container-build` is created successfully under service role `clauserunner-codebuild-role` with privileged Docker capabilities.
 
 ---
 
 ## 3. Deployment Automation Tools
 
-- **`deploy_ecs.ps1`**: Located in the project root, this PowerShell script compiles local React assets, authenticates Docker to ECR, builds/tags/pushes the Docker image, and triggers service creation on `aws ecs create-express-gateway-service` using the owner's provisioned IAM roles.
+- **AWS CodeBuild Remote Builder**: The container build process is conducted entirely in AWS CodeBuild. A zip archive of the workspace source is uploaded to our S3 bucket, which triggers CodeBuild to securely compile React assets, build the unified Docker image, and push it to Amazon ECR. This completely bypasses the need for local Docker or container engines on the host machine.
+- **`deploy_ecs.ps1`**: PowerShell helper script updated to focus on calling AWS ECS Express Mode deployment API once the remote CodeBuild image is ready in ECR.
+
