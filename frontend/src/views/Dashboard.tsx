@@ -48,10 +48,10 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: string, d?: 
             Signed contracts become actively monitored obligations. ClauseRunner investigates compliance evidence, proposes remedies, and keeps consequential executions (like claiming SLA credits) behind human authorization.
           </p>
           <div className="pt-2 flex items-center space-x-2 text-xs">
-            <span className="text-slate-400">👋 Welcome Judge!</span>
+            <span className="text-slate-400">⚡ Demo Ready</span>
             <span className="text-slate-500">•</span>
             <button onClick={() => onNavigate('obligation_detail', 'clauserunner-obligation-acme-sla')} className="text-brand-300 font-bold hover:underline flex items-center">
-              Click "Launch Golden SLA" below to start the demo <ArrowRight size={10} className="ml-1" />
+              Click "Launch Golden SLA" below to begin <ArrowRight size={10} className="ml-1" />
             </button>
           </div>
         </div>
@@ -127,7 +127,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: string, d?: 
           <span>S3: <span className="text-green-600 font-bold">Active</span></span>
           <span>DynamoDB: <span className="text-green-600 font-bold">Active</span></span>
           <span>EventBridge: <span className="text-green-600 font-bold">Active</span></span>
-          <span>AWS Bedrock: <span className="text-amber-600 font-bold">Pending Auth</span></span>
         </div>
       </div>
     </div>
