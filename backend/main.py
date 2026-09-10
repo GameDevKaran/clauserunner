@@ -12,6 +12,7 @@ from backend.domain.models import (
 from backend.repositories.db import get_repo, init_db
 from backend.agent.strands_agent import is_bedrock_available, run_investigation
 from backend.tools.write_tools import execute_approved_action, attach_evidence
+from backend.services.logger import logger
 
 app = FastAPI(title="ClauseRunner API", version="1.0.0")
 
@@ -26,6 +27,8 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_event():
     init_db("clauserunner.sqlite")
+    logger.info("Initializing ClauseRunner FastAPI application server...")
+
 
 class EvidenceCreate(BaseModel):
     name: str
@@ -43,13 +46,15 @@ class ExecutionTrigger(BaseModel):
 @app.get("/api/health")
 def health_check() -> Dict[str, Any]:
     bedrock_ok = is_bedrock_available()
+    logger.info("Health check endpoint called", extra_fields={"bedrock_ok": bedrock_ok})
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "database": "sqlite_local",
+        "database": "dynamodb" if os.environ.get("CLAUSERUNNER_DYNAMODB_TABLE") else "sqlite_local",
         "agent_mode": "strands_live_bedrock" if bedrock_ok else "strands_deterministic_mock",
         "bedrock_configured": bedrock_ok,
     }
+
 
 @app.get("/api/contracts", response_model=List[Contract])
 def get_contracts():
@@ -81,6 +86,7 @@ def get_obligation_evidence(id: str):
 
 @app.post("/api/obligations/{id}/evidence", response_model=EvidenceArtifact)
 def upload_obligation_evidence(id: str, payload: EvidenceCreate):
+    logger.info("Evidence upload triggered", extra_fields={"obligation_id": id, "evidence_name": payload.name})
     res = attach_evidence(obligation_id=id, name=payload.name, content_type=payload.content_type, file_path_or_url=payload.file_path_or_url, raw_data_summary=payload.raw_data_summary)
     if "error" in res: raise HTTPException(400, res["error"])
     return get_repo().get_evidence(res["id"])
@@ -91,6 +97,7 @@ def get_obligation_audit(id: str):
 
 @app.post("/api/obligations/{id}/investigate")
 async def trigger_investigation(id: str):
+    logger.info("Strands Agent investigation triggered", extra_fields={"obligation_id": id})
     res = await run_investigation(id)
     if "error" in res: raise HTTPException(400, res["error"])
     return res

@@ -40,3 +40,26 @@ This document maps the major ClauseRunner product features and technical claims 
 - **Technical Proof**:
   - **Events logging**: Every state-changing tool call (evidence attached, action proposed, approval, execution) automatically commits an `AuditEvent` payload into the SQLite/DynamoDB table.
   - **UI Visualization**: `frontend/src/views/AuditTrail.tsx` fetches and renders the unified timeline showing every single step with a timestamp.
+
+
+---
+
+## 2. AWS Serverless Infrastructure Proofs
+
+### Claim: "Uses Amazon S3 for Evidence Storage"
+- **Technical Proof**:
+  - Bucket name: `clauserunner-contracts-772097700032-us-east-1`
+  - Evaluates file paths natively (e.g. `/s3/evidence/acme_march_2026.json`).
+  - S3 bucket creation, SSE default encryption, private-only access blocks, and programmatical write/read/delete capabilities have been verified successfully under our `clauserunner-dev` credentials.
+
+### Claim: "Uses Amazon DynamoDB for Contract State"
+- **Technical Proof**:
+  - Single-table name: `clauserunner-state`
+  - Integrated via `backend/repositories/dynamodb_repo.py` using Single-Table key schema conventions (`PK = PREFIX#[id]`, `SK = METADATA`).
+  - Seeding and CRUD points (write/read/update) are fully verified and integrated dynamically under standard environment variables.
+
+### Claim: "Uses EventBridge for Automated Obligation Checks"
+- **Technical Proof**:
+  - Exposes endpoint `POST /api/obligations/check-all` which is called programmatically by Amazon EventBridge Scheduler (target rule `clauserunner-obligation-check`).
+  - Core checker logic implemented in `backend/services/checker.py` evaluates upcoming renewal deadlines and SLA log completions deterministically, generating immutable audit events in DynamoDB.
+
