@@ -154,3 +154,28 @@ def trigger_action_execution(id: str, payload: ExecutionTrigger):
 @app.get("/api/actions", response_model=List[ProposedAction])
 def list_proposed_actions(obligation_id: Optional[str] = None):
     return get_repo().list_proposed_actions(obligation_id)
+
+
+from backend.services.checker import run_scheduled_check
+
+@app.post("/api/obligations/check-all")
+def trigger_scheduled_check():
+    count = run_scheduled_check()
+
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+# SPA catch-all routing for any deep-linking page refreshes
+@app.exception_handler(404)
+async def custom_404_handler(request, exc):
+    if not request.url.path.startswith("/api") and os.path.exists("frontend/dist/index.html"):
+        return FileResponse("frontend/dist/index.html")
+    raise exc
+
+# Serve pre-compiled React static assets
+if os.path.exists("frontend/dist"):
+    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
+
+    return {"status": "success", "checked_obligations_count": count}
+

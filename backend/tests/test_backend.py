@@ -146,3 +146,42 @@ def test_api_integration():
     resp_obs = client.get("/api/obligations")
     assert resp_obs.status_code == 200
     assert len(resp_obs.json()) == 3
+
+
+# 6. Test Scheduled Checker Capability
+def test_scheduled_checker():
+    # Use memory database
+    repo = init_db(":memory:")
+    
+    from backend.services.checker import run_scheduled_check
+    count = run_scheduled_check()
+    assert count == 2  # Seeder creates 3 obligations, 1 is completed (SOC 2), so 2 active obligations are checked!
+    
+    # Verify that scheduled_check audit events are created
+    audits = repo.list_audit_events()
+    sched_events = [a for a in audits if a.action_type == "scheduled_check"]
+    assert len(sched_events) == 2
+    assert "Scheduled check" in sched_events[0].description
+
+# 7. Test Bedrock Provider Fallback Logic
+def test_bedrock_provider_live_state():
+    from backend.agent.strands_agent import is_bedrock_available
+    # If no keys or profiles are configured in test runner, should default to False
+    import os
+    orig_access_key = os.environ.get("AWS_ACCESS_KEY_ID")
+    orig_secret = os.environ.get("AWS_SECRET_ACCESS_KEY")
+    orig_profile = os.environ.get("AWS_PROFILE")
+    
+    try:
+        # Force unset credentials to simulate mock environment
+        if "AWS_ACCESS_KEY_ID" in os.environ: del os.environ["AWS_ACCESS_KEY_ID"]
+        if "AWS_SECRET_ACCESS_KEY" in os.environ: del os.environ["AWS_SECRET_ACCESS_KEY"]
+        if "AWS_PROFILE" in os.environ: del os.environ["AWS_PROFILE"]
+        
+        assert is_bedrock_available() is False
+    finally:
+        # Restore original credentials
+        if orig_access_key: os.environ["AWS_ACCESS_KEY_ID"] = orig_access_key
+        if orig_secret: os.environ["AWS_SECRET_ACCESS_KEY"] = orig_secret
+        if orig_profile: os.environ["AWS_PROFILE"] = orig_profile
+

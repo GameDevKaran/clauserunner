@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = window.location.port === '5173' ? 'http://localhost:8000/api' : '/api';
 
 export async function fetchHealth() {
   const r = await fetch(`${API_BASE}/health`);
