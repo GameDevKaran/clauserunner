@@ -103,6 +103,16 @@ npm run build
 
 ---
 
+## Live AWS Deployment
+
+ClauseRunner is deployed to AWS us-east-1 under our highly secure and fully serverless architecture:
+- **Hosted Public Web Application**: [https://cl-a7d669f525024e6a8413b2e0f7b851c8.ecs.us-east-1.on.aws/](https://cl-a7d669f525024e6a8413b2e0f7b851c8.ecs.us-east-1.on.aws/)
+- **Secure Remote Container Builds**: Triggered automatically on push via GitHub Actions with secure OIDC-role authentication (zero local credentials needed!).
+- **Amazon ECS Express Mode**: The unified FastAPI + React container runs on Fargate behind managed AWS network infrastructure with strict task-role security.
+- **Automated Obligation Checking**: Driven by an EventBridge Connection, API Destination, and Scheduled Rule calling our checking webhook.
+
+---
+
 ## License
 
 This project is licensed under the **MIT License**—see the [LICENSE](LICENSE) file for details.

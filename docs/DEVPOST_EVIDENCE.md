@@ -60,6 +60,6 @@ This document maps the major ClauseRunner product features and technical claims 
 
 ### Claim: "Uses EventBridge for Automated Obligation Checks"
 - **Technical Proof**:
-  - Exposes endpoint `POST /api/obligations/check-all` which is called programmatically by Amazon EventBridge Scheduler (target rule `clauserunner-obligation-check`).
+  - Exposes endpoint `POST /api/obligations/check-all` which is called programmatically by Amazon EventBridge Rule `clauserunner-obligation-check` targeting API Destination `clauserunner-api-destination`.
   - Core checker logic implemented in `backend/services/checker.py` evaluates upcoming renewal deadlines and SLA log completions deterministically, generating immutable audit events in DynamoDB.
 
