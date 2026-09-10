@@ -43,6 +43,7 @@ class ApprovalDecision(BaseModel):
 class ExecutionTrigger(BaseModel):
     executed_by: str
 
+@app.get("/health")
 @app.get("/api/health")
 def health_check() -> Dict[str, Any]:
     bedrock_ok = is_bedrock_available()
