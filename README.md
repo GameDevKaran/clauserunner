@@ -103,13 +103,34 @@ npm run build
 
 ---
 
-## Live AWS Deployment
+## Live Demo
 
-ClauseRunner is deployed to AWS us-east-1 under our highly secure and fully serverless architecture:
+ClauseRunner is live at [https://cl-a7d669f525024e6a8413b2e0f7b851c8.ecs.us-east-1.on.aws/](https://cl-a7d669f525024e6a8413b2e0f7b851c8.ecs.us-east-1.on.aws/).
+
+The production deployment uses:
+
 - **Hosted Public Web Application**: [https://cl-a7d669f525024e6a8413b2e0f7b851c8.ecs.us-east-1.on.aws/](https://cl-a7d669f525024e6a8413b2e0f7b851c8.ecs.us-east-1.on.aws/)
 - **Secure Remote Container Builds**: Triggered automatically on push via GitHub Actions with secure OIDC-role authentication (zero local credentials needed!).
 - **Amazon ECS Express Mode**: The unified FastAPI + React container runs on Fargate behind managed AWS network infrastructure with strict task-role security.
 - **Automated Obligation Checking**: Driven by an EventBridge Connection, API Destination, and Scheduled Rule calling our checking webhook.
+
+---
+
+## Demo Screenshots
+
+### Dashboard
+
+![ClauseRunner dashboard](docs/assets/devpost/01_ClauseRunner_Dashboard.png)
+
+### Human Approval Queue
+
+![Human Approval Queue](docs/assets/devpost/03_Human_Approval_Queue.png)
+
+### AWS Architecture
+
+![ClauseRunner AWS architecture](docs/assets/devpost/05_ClauseRunner_AWS_Architecture.png)
+
+[View the complete Devpost media gallery](docs/DEVPOST_MEDIA.md).
 
 ---
 
