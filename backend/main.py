@@ -97,6 +97,10 @@ def upload_obligation_evidence(id: str, payload: EvidenceCreate):
 def get_obligation_audit(id: str):
     return get_repo().list_audit_events(id)
 
+@app.get("/api/audit", response_model=List[AuditEvent])
+def get_audit_events():
+    return get_repo().list_audit_events(None)
+
 @app.post("/api/obligations/{id}/investigate")
 async def trigger_investigation(id: str):
     logger.info("Strands Agent investigation triggered", extra={"extra_fields": {"obligation_id": id}})

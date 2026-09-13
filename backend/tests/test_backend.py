@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime
 from fastapi.testclient import TestClient
 
-from backend.domain.models import ObligationStatus, ObligationType, ApprovalStatus, ActionStatus
+from backend.domain.models import AuditEvent, ObligationStatus, ObligationType, ApprovalStatus, ActionStatus
 from backend.domain.state_machine import ObligationStateMachine, InvalidStateTransition
 from backend.services.engine import calculate_sla_remedy, evaluate_notice_window
 from backend.repositories.sqlite_repo import SQLiteRepository
@@ -146,6 +146,44 @@ def test_api_integration():
     resp_obs = client.get("/api/obligations")
     assert resp_obs.status_code == 200
     assert len(resp_obs.json()) == 3
+
+
+def test_global_and_obligation_audit_endpoints():
+    repo = init_db(":memory:")
+    client = TestClient(app)
+
+    acme_event = AuditEvent(
+        id="audit-api-global-acme",
+        contract_id="clauserunner-contract-acme",
+        obligation_id="clauserunner-obligation-acme-sla",
+        action_type="test_event",
+        description="Global audit endpoint test event.",
+        user_or_system="Test Suite",
+    )
+    cyber_event = AuditEvent(
+        id="audit-api-global-cyber",
+        contract_id="clauserunner-contract-cybershield",
+        obligation_id="clauserunner-obligation-cyber-soc2",
+        action_type="test_event",
+        description="Obligation audit endpoint test event.",
+        user_or_system="Test Suite",
+    )
+    repo.save_audit_event(acme_event)
+    repo.save_audit_event(cyber_event)
+
+    global_response = client.get("/api/audit")
+    assert global_response.status_code == 200
+    global_ids = {event["id"] for event in global_response.json()}
+    assert acme_event.id in global_ids
+    assert cyber_event.id in global_ids
+
+    obligation_response = client.get(
+        "/api/obligations/clauserunner-obligation-acme-sla/audit"
+    )
+    assert obligation_response.status_code == 200
+    obligation_events = obligation_response.json()
+    assert acme_event.id in {event["id"] for event in obligation_events}
+    assert cyber_event.id not in {event["id"] for event in obligation_events}
 
 
 # 6. Test Scheduled Checker Capability

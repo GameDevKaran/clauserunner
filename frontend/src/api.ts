@@ -45,8 +45,9 @@ export async function attachEvidence(obligationId: string, payload: { name: stri
   return r.json();
 }
 
-export async function fetchAuditEvents(obligationId: string) {
-  const r = await fetch(`${API_BASE}/obligations/${obligationId}/audit`);
+export async function fetchAuditEvents(obligationId?: string) {
+  const url = obligationId ? `${API_BASE}/obligations/${obligationId}/audit` : `${API_BASE}/audit`;
+  const r = await fetch(url);
   return r.json();
 }
 

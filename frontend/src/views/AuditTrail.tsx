@@ -9,8 +9,7 @@ export default function AuditTrail() {
   useEffect(() => {
     async function loadEvents() {
       try {
-        // Fetch global audit log (passing no obligation_id returns all events)
-        const data = await fetchAuditEvents('');
+        const data = await fetchAuditEvents();
         setEvents(data);
       } catch (e) {
         console.error(e);
