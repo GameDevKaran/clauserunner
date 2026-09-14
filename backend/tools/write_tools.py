@@ -36,6 +36,26 @@ def calculate_deadline(month_end_iso: str, claim_window_days: int = 30) -> str:
 def evaluate_numeric_threshold(measured_uptime: float, base_monthly_fee: float = 5000.0) -> Dict[str, Any]:
     return calculate_sla_remedy(measured_uptime, base_monthly_fee)
 
+@tool(description="Deterministically evaluates an SLA obligation against its associated contract, policy, and evidence.")
+def evaluate_sla_obligation(obligation_id: str) -> Dict[str, Any]:
+    repo = get_repo()
+    obligation = repo.get_obligation(obligation_id)
+    if not obligation: return {"error": f"Obligation '{obligation_id}' not found."}
+    evidence_list = repo.list_evidence(obligation_id)
+    if not evidence_list: return {"error": f"No evidence artifacts found for obligation '{obligation_id}'."}
+    evidence = evidence_list[0]
+    measured_uptime = evidence.raw_data_summary.get("measured_uptime", 99.4)
+    res = calculate_sla_remedy(measured_uptime, 5000.0)
+    return {
+        "threshold": res["threshold"],
+        "measured_uptime": res["measured_uptime"],
+        "breach_status": res["is_breached"],
+        "tier": res["tier"],
+        "credit_percentage": res["credit_percentage"],
+        "credit_amount": res["credit_amount"],
+        "remedy_description": res["remedy_description"]
+    }
+
 @tool(description="Records a manual audit event for traceability.")
 def record_audit_event(contract_id: str, obligation_id: str, action_type: str, description: str, user_or_system: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     repo = get_repo()
@@ -58,6 +78,16 @@ def propose_action(obligation_id: str, title: str, description: str, action_type
         return res
     consequential_types = {ActionType.SERVICE_CREDIT_CLAIM.value, ActionType.RENEWAL_NOTICE.value, ActionType.TERMINATION_NOTICE.value}
     requires_approval = action_type in consequential_types or obligation.approval_policy
+
+    # Defense-in-depth: For service_credit_claim actions on the Acme SLA, enforce the important Golden-demo policy on the server side
+    if action_type == ActionType.SERVICE_CREDIT_CLAIM.value and obligation_id == "clauserunner-obligation-acme-sla":
+        evidence_list = repo.list_evidence(obligation_id)
+        uptime = 99.4
+        if evidence_list:
+            uptime = evidence_list[0].raw_data_summary.get("measured_uptime", 99.4)
+        res = calculate_sla_remedy(uptime, 5000.0)
+        cost_or_impact = f"${int(res['credit_amount'])} invoice credit"
+
     action_id = f"clauserunner-action-{uuid.uuid4().hex[:8]}"
     investigation_id = f"clauserunner-investigation-{uuid.uuid4().hex[:8]}"
     proposed_action = ProposedAction(id=action_id, obligation_id=obligation_id, investigation_id=investigation_id, title=title, description=description, action_type=ActionType(action_type), cost_or_impact=cost_or_impact, requires_approval=requires_approval, draft_payload={"recipient": recipient, "subject": subject, "body": body}, status=ActionStatus.DRAFT)

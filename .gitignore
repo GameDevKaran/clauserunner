@@ -28,3 +28,9 @@ data/
 
 .DS_Store
 Thumbs.db
+
+# Office Temp Lock Files
+~$*.pptx
+~$*.docx
+~$*.xlsx
+

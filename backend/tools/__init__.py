@@ -16,7 +16,8 @@ from backend.tools.write_tools import (
     propose_action,
     request_approval,
     execute_approved_action,
-    record_audit_event
+    record_audit_event,
+    evaluate_sla_obligation
 )
 
 ALL_TOOLS = [
@@ -35,7 +36,8 @@ ALL_TOOLS = [
     propose_action,
     request_approval,
     execute_approved_action,
-    record_audit_event
+    record_audit_event,
+    evaluate_sla_obligation
 ]
 
 # Investigation tools specifically exclude execute_approved_action for human-control boundary enforcement
@@ -51,7 +53,7 @@ INVESTIGATION_TOOLS = [
     get_approval,
     attach_evidence,
     calculate_deadline,
-    evaluate_numeric_threshold,
+    evaluate_sla_obligation,
     propose_action,
     request_approval,
     record_audit_event

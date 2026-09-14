@@ -57,6 +57,7 @@ def is_bedrock_available(force_fresh: bool = False) -> bool:
     _bedrock_cache_time = time.time()
     return _bedrock_cache_status
 
+
 async def run_live_investigation(obligation_id: str) -> Dict[str, Any]:
     """Runs a live Strands Agent loop on AWS Bedrock using Nova 2 Lite with strict limits."""
     from backend.services.investigation_prep import prepare_investigation_cycle
@@ -87,7 +88,7 @@ async def run_live_investigation(obligation_id: str) -> Dict[str, Any]:
         temperature=0.0,
         max_tokens=2048,
         streaming=False,
-        botocore_config=botocore_config
+        boto_client_config=botocore_config
     )
 
     system_prompt = (
@@ -98,7 +99,7 @@ async def run_live_investigation(obligation_id: str) -> Dict[str, Any]:
         "2. Retrieve the contract and clauses using 'get_contract' and 'list_contract_clauses'.\n"
         "3. Retrieve the evidence artifacts using 'list_evidence'.\n"
         "4. NEVER calculate SLA remedies, deadlines, or business numbers yourself.\n"
-        "5. ALWAYS use the deterministic tools 'evaluate_numeric_threshold' or 'calculate_deadline' for computations.\n"
+        "5. ALWAYS use the deterministic tools 'evaluate_sla_obligation' or 'calculate_deadline' for computations.\n"
         "6. If the evaluation shows a breach/issue, propose the action using 'propose_action'.\n"
         "7. Request human approval for the proposed action using 'request_approval'.\n"
         "8. STOP immediately once a proposed action has been submitted for approval.\n"
@@ -119,7 +120,11 @@ async def run_live_investigation(obligation_id: str) -> Dict[str, Any]:
         result = await asyncio.wait_for(
             agent.invoke_async(
                 prompt,
-                max_turns=8
+                limits={
+                    "turns": 8,
+                    "output_tokens": 3000,
+                    "total_tokens": 12000,
+                }
             ),
             timeout=35.0
         )
@@ -130,17 +135,42 @@ async def run_live_investigation(obligation_id: str) -> Dict[str, Any]:
 
     # Postcondition validation check
     repo = get_repo()
+    updated_ob = repo.get_obligation(obligation_id)
+    if not updated_ob:
+        return {"error": "Obligation not found after investigation."}
+        
     actions = repo.list_proposed_actions(obligation_id)
     active_actions = [a for a in actions if a.status in {ActionStatus.DRAFT, ActionStatus.APPROVED}]
+    executed_actions = [a for a in actions if a.status == ActionStatus.EXECUTED]
 
-    if not active_actions:
-        return {"error": "Live Agent failed to propose a valid operational action for this obligation."}
+    # Postconditions:
+    # 1. obligation.status == APPROVAL_REQUIRED
+    if updated_ob.status != ObligationStatus.APPROVAL_REQUIRED:
+        from backend.services.logger import logger
+        logger.error(f"Live Bedrock investigation failed postcondition: obligation status is '{updated_ob.status.value}' instead of 'approval_required'")
+        return {"error": f"Investigation completed with incorrect final status: '{updated_ob.status.value}'."}
+
+    # 2. exactly one active service-credit action exists for the current cycle
+    if len(active_actions) != 1:
+        from backend.services.logger import logger
+        logger.error(f"Live Bedrock investigation failed postcondition: expected exactly 1 active action, found {len(active_actions)}")
+        return {"error": f"Investigation completed with invalid number of proposed actions: {len(active_actions)}."}
 
     latest_action = active_actions[0]
+
+    # 3. no action has been executed
+    if executed_actions:
+        from backend.services.logger import logger
+        logger.error("Live Bedrock investigation failed postcondition: action was autonomously executed")
+        return {"error": "Security Breach: Autonomous execution occurred without human approval."}
+
+    # 4. one corresponding approval request exists
     approvals = repo.list_approval_requests()
     matching_approval = next((a for a in approvals if a.proposed_action_id == latest_action.id), None)
 
     if not matching_approval:
+        from backend.services.logger import logger
+        logger.error("Live Bedrock investigation failed postcondition: matching approval request not found")
         return {"error": "Live Agent proposed an action but failed to submit a valid approval request."}
 
     return {
@@ -158,8 +188,3 @@ async def run_investigation(obligation_id: str) -> Dict[str, Any]:
     else:
         from backend.agent.mock_agent import run_mock_investigation
         return await run_mock_investigation(obligation_id)
-
-        _bedrock_cache_status = False
-        
-    _bedrock_cache_time = time.time()
-    return _bedrock_cache_status

@@ -435,3 +435,56 @@ async def test_repeatable_api_workflow_and_idempotency():
     assert len(repo.list_proposed_actions(ob_id)) == 2
     assert len(repo.list_approval_requests()) == 2
 
+# 12. Test BedrockModel constructor parameters and signature compliance
+def test_strands_bedrock_constructor_signature_compliance():
+    from strands.models import BedrockModel
+    import inspect
+    sig = inspect.signature(BedrockModel.__init__)
+    assert "boto_client_config" in sig.parameters
+    assert "botocore_config" not in sig.parameters
+
+# 13. Test domain SLA evaluation tool results
+def test_evaluate_sla_obligation_deterministic_policy():
+    repo = init_db(":memory:")
+    from backend.repositories.seed import seed_demo_data
+    seed_demo_data(repo)
+    
+    from backend.tools.write_tools import evaluate_sla_obligation
+    res = evaluate_sla_obligation("clauserunner-obligation-acme-sla")
+    assert res["threshold"] == 99.9
+    assert res["measured_uptime"] == 99.4
+    assert res["breach_status"] is True
+    assert res["tier"] == 1
+    assert res["credit_percentage"] == 0.10
+    assert res["credit_amount"] == 500.0
+    assert "Tier 1 SLA Breach" in res["remedy_description"]
+
+# 14. Test live Bedrock postconditions and security guards
+@pytest.mark.asyncio
+async def test_live_bedrock_postconditions_and_guards(monkeypatch):
+    from backend.agent.strands_agent import run_live_investigation
+    repo = init_db(":memory:")
+    from backend.repositories.seed import seed_demo_data
+    seed_demo_data(repo)
+    
+    from unittest.mock import MagicMock
+    mock_session = MagicMock()
+    monkeypatch.setattr("boto3.Session", lambda *args, **kwargs: mock_session)
+    
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            pass
+        async def invoke_async(self, *args, **kwargs):
+            assert "limits" in kwargs
+            assert kwargs["limits"]["turns"] == 8
+            assert kwargs["limits"]["output_tokens"] == 3000
+            assert kwargs["limits"]["total_tokens"] == 12000
+            return "Completed"
+            
+    monkeypatch.setattr("backend.agent.strands_agent.Agent", FakeAgent)
+    
+    res = await run_live_investigation("clauserunner-obligation-acme-sla")
+    assert "error" in res
+    assert "incorrect final status" in res["error"]
+
+

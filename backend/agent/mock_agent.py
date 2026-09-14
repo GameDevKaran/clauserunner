@@ -28,9 +28,9 @@ async def run_mock_investigation(obligation_id: str) -> Dict[str, Any]:
     investigation_id = f"clauserunner-investigation-{uuid.uuid4().hex[:8]}"
     if obligation.obligation_type.value == "sla" and evidence_list:
         uptime = evidence_list[0].raw_data_summary.get("measured_uptime", 99.4)
-        from backend.tools.write_tools import evaluate_numeric_threshold, propose_action, request_approval
-        eval_result = evaluate_numeric_threshold(uptime, 5000.0)
-        steps.append(ToolExecution(tool_name="evaluate_numeric_threshold", inputs={"measured_uptime": uptime}, outputs=eval_result))
+        from backend.tools.write_tools import evaluate_sla_obligation, propose_action, request_approval
+        eval_result = evaluate_sla_obligation(obligation_id=obligation_id)
+        steps.append(ToolExecution(tool_name="evaluate_sla_obligation", inputs={"obligation_id": obligation_id}, outputs=eval_result))
         action_result = propose_action(
             obligation_id=obligation_id, title="Claim 10% Service Credit for March 2026 SLA Breach",
             description=f"Measured uptime was {uptime}% which fell below 99.9% commitment. Tier 1 applies.",
