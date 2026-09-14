@@ -2,7 +2,8 @@ import os
 import uuid
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -24,6 +25,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    err_id = f"err-{uuid.uuid4().hex[:8]}"
+    logger.error(f"Unhandled error occurred: ID={err_id} Path={request.url.path} Method={request.method}", exc_info=exc)
+    return JSONResponse(status_code=500, content={"error": "Internal server error", "request_id": err_id})
+
 
 @app.on_event("startup")
 def startup_event():
@@ -127,6 +137,10 @@ def approve_request(id: str, decision: ApprovalDecision):
     repo = get_repo()
     req = repo.get_approval_request(id)
     if not req: raise HTTPException(404, "Approval request not found")
+    if req.status != ApprovalStatus.PENDING:
+        if req.status == ApprovalStatus.APPROVED:
+            return req
+        raise HTTPException(409, "Approval request is already REJECTED and cannot be changed to APPROVED.")
     req.status = ApprovalStatus.APPROVED
     req.approved_by = decision.approved_by
     req.comments = decision.comments
@@ -151,6 +165,10 @@ def reject_request(id: str, decision: ApprovalDecision):
     repo = get_repo()
     req = repo.get_approval_request(id)
     if not req: raise HTTPException(404, "Approval request not found")
+    if req.status != ApprovalStatus.PENDING:
+        if req.status == ApprovalStatus.REJECTED:
+            return req
+        raise HTTPException(409, "Approval request is already APPROVED and cannot be changed to REJECTED.")
     req.status = ApprovalStatus.REJECTED
     req.approved_by = decision.approved_by
     req.comments = decision.comments

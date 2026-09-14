@@ -93,7 +93,7 @@ export default function App() {
             </div>
             {health ? (
               <p className="text-[10px] text-slate-400 font-semibold truncate flex items-center">
-                <Cpu size={10} className="mr-1" /> {health.agent_mode === 'strands_live_bedrock' ? 'AWS Bedrock Live' : 'Deterministic Mock'}
+                <Cpu size={10} className="mr-1" /> {health.agent_mode === 'strands_live_bedrock' ? 'AWS Bedrock Live' : 'Deterministic Fallback'}
               </p>
             ) : (
               <p className="text-[10px] text-slate-500">Checking system status...</p>
@@ -116,7 +116,7 @@ export default function App() {
               </span>
             ) : (
               <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded font-bold uppercase text-[9px] flex items-center shadow-sm">
-                LOCAL MOCK MODE
+                DETERMINISTIC FALLBACK
               </span>
             )}
             <span className="text-slate-400">|</span>

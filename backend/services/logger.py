@@ -24,6 +24,11 @@ class JSONFormatter(logging.Formatter):
                     continue
                 payload[k] = v
                 
+        # Format and append unhandled tracebacks/exceptions if present
+        if record.exc_info:
+            import traceback
+            payload["exception"] = "".join(traceback.format_exception(*record.exc_info))
+                
         return json.dumps(payload)
 
 def setup_logger(name: str = "clauserunner") -> logging.Logger:

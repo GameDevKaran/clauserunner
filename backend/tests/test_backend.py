@@ -302,3 +302,136 @@ def test_bedrock_provider_live_state():
         if orig_secret: os.environ["AWS_SECRET_ACCESS_KEY"] = orig_secret
         if orig_profile: os.environ["AWS_PROFILE"] = orig_profile
 
+
+# 8. Test DynamoDB codec serialization and pagination
+def test_dynamodb_codec_and_pagination():
+    import json
+    from decimal import Decimal
+    from backend.repositories.dynamodb_base import DynamoDBBase, DynamoDBJSONEncoder
+    from backend.domain.models import ActionStatus
+    
+    class MockTable:
+        def __init__(self):
+            self.items = []
+            self.scan_calls = 0
+            
+        def put_item(self, Item):
+            self.items.append(Item)
+            
+        def scan(self, **kwargs):
+            self.scan_calls += 1
+            if self.scan_calls == 1:
+                return {
+                    "Items": [{"PK": "TEST#1", "SK": "METADATA", "val": "first"}],
+                    "LastEvaluatedKey": "page1"
+                }
+            return {
+                "Items": [{"PK": "TEST#2", "SK": "METADATA", "val": "second"}]
+            }
+
+    base = DynamoDBBase.__new__(DynamoDBBase)
+    base.table = MockTable()
+    
+    assert base._serialize_value(1.5) == Decimal("1.5")
+    assert base._serialize_value(datetime(2026, 9, 14)) == "2026-09-14T00:00:00"
+    assert base._serialize_value(ActionStatus.DRAFT) == "draft"
+    
+    nested = {"date": datetime(2026, 9, 14), "status": ActionStatus.DRAFT, "val": Decimal("1.5")}
+    serialized_nested = base._serialize_value(nested)
+    parsed = json.loads(serialized_nested)
+    assert parsed["date"] == "2026-09-14T00:00:00"
+    assert parsed["status"] == "draft"
+    assert parsed["val"] == 1.5
+
+    all_items = base._scan_by_sk("METADATA")
+    assert len(all_items) == 2
+    assert base.table.scan_calls == 2
+
+# 9. Test Bedrock Runtime probe and fallback mechanics
+def test_bedrock_runtime_probe_and_fallback(monkeypatch):
+    from backend.agent.strands_agent import is_bedrock_available
+    import botocore.exceptions
+    
+    class MockBedrockRuntimeClientNotAuthorized:
+        def converse(self, **kwargs):
+            raise botocore.exceptions.ClientError(
+                {"Error": {"Code": "ValidationException", "Message": "Operation not allowed"}},
+                "Converse"
+            )
+            
+    class MockSessionNotAuthorized:
+        def client(self, service_name, **kwargs):
+            return MockBedrockRuntimeClientNotAuthorized()
+            
+    monkeypatch.setattr("boto3.Session", lambda *args, **kwargs: MockSessionNotAuthorized())
+    assert is_bedrock_available(force_fresh=True) is False
+
+    class MockBedrockRuntimeClientSuccess:
+        def converse(self, **kwargs):
+            return {"ResponseMetadata": {"HTTPStatusCode": 200}}
+            
+    class MockSessionSuccess:
+        def client(self, service_name, **kwargs):
+            return MockBedrockRuntimeClientSuccess()
+            
+    monkeypatch.setattr("boto3.Session", lambda *args, **kwargs: MockSessionSuccess())
+    assert is_bedrock_available(force_fresh=True) is True
+
+# 10. Test Live Agent Tools Boundary and JSON safety
+def test_live_agent_tools_boundary_and_json_safety():
+    from backend.tools import INVESTIGATION_TOOLS, ALL_TOOLS
+    from backend.tools.write_tools import execute_approved_action
+    from backend.repositories.dynamodb_base import DynamoDBJSONEncoder
+    
+    assert execute_approved_action not in INVESTIGATION_TOOLS
+    assert execute_approved_action in ALL_TOOLS
+    
+    import json
+    from backend.services.engine import evaluate_notice_window
+    res = evaluate_notice_window(datetime(2027, 1, 1), current_time=datetime(2026, 9, 14))
+    serialized = json.dumps(res, cls=DynamoDBJSONEncoder)
+    assert "2027-01-01" in serialized
+
+# 11. Test repeatable API-driven Golden SLA workflow and tool idempotency
+@pytest.mark.asyncio
+async def test_repeatable_api_workflow_and_idempotency():
+    repo = init_db(":memory:")
+    client = TestClient(app)
+    ob_id = "clauserunner-obligation-acme-sla"
+    
+    res1 = client.post(f"/api/obligations/{ob_id}/investigate")
+    assert res1.status_code == 200
+    assert len(repo.list_proposed_actions(ob_id)) == 1
+    assert len(repo.list_approval_requests()) == 1
+    
+    res2 = client.post(f"/api/obligations/{ob_id}/investigate")
+    assert res2.status_code == 200
+    assert res2.json().get("reused_existing_action") is True
+    assert len(repo.list_proposed_actions(ob_id)) == 1
+    assert len(repo.list_approval_requests()) == 1
+
+    approval = repo.list_approval_requests()[0]
+    app_res1 = client.post(f"/api/approvals/{approval.id}/approve", json={"approved_by": "Test Manager", "comments": "Approve SLA"})
+    assert app_res1.status_code == 200
+    
+    app_res2 = client.post(f"/api/approvals/{approval.id}/approve", json={"approved_by": "Test Manager", "comments": "Approve SLA"})
+    assert app_res2.status_code == 200
+    
+    rej_res = client.post(f"/api/approvals/{approval.id}/reject", json={"approved_by": "Test Manager", "comments": "Reject SLA"})
+    assert rej_res.status_code == 409
+
+    action = repo.list_proposed_actions(ob_id)[0]
+    exec_res1 = client.post(f"/api/actions/{action.id}/execute", json={"executed_by": "Test Operator"})
+    assert exec_res1.status_code == 200
+    assert repo.get_obligation(ob_id).status == ObligationStatus.COMPLETED
+
+    exec_res2 = client.post(f"/api/actions/{action.id}/execute", json={"executed_by": "Test Operator"})
+    assert exec_res2.status_code == 200
+    assert exec_res2.json().get("already_executed") is True
+
+    res_new = client.post(f"/api/obligations/{ob_id}/investigate")
+    assert res_new.status_code == 200
+    assert repo.get_obligation(ob_id).status == ObligationStatus.APPROVAL_REQUIRED
+    assert len(repo.list_proposed_actions(ob_id)) == 2
+    assert len(repo.list_approval_requests()) == 2
+

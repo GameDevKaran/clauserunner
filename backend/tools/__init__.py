@@ -37,3 +37,22 @@ ALL_TOOLS = [
     execute_approved_action,
     record_audit_event
 ]
+
+# Investigation tools specifically exclude execute_approved_action for human-control boundary enforcement
+INVESTIGATION_TOOLS = [
+    get_contract,
+    get_clause,
+    list_contract_clauses,
+    list_obligations,
+    get_obligation,
+    list_evidence,
+    get_evidence,
+    get_obligation_history,
+    get_approval,
+    attach_evidence,
+    calculate_deadline,
+    evaluate_numeric_threshold,
+    propose_action,
+    request_approval,
+    record_audit_event
+]

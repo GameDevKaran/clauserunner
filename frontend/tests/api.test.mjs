@@ -64,3 +64,59 @@ test('fetchAuditEvents adds bounded pagination without malformed paths', async (
   ]);
   assert.ok(urls.every(url => !url.includes('/obligations//')));
 });
+
+test('requestJson handles valid JSON 200 response successfully', async () => {
+  const api = await loadApi(async (url) => {
+    return {
+      status: 200,
+      ok: true,
+      headers: { get: (name) => name.toLowerCase() === 'content-type' ? 'application/json' : null },
+      json: async () => ({ status: 'healthy' })
+    };
+  });
+  const res = await api.fetchHealth();
+  assert.deepEqual(res, { status: 'healthy' });
+});
+
+test('requestJson handles empty 240/204 response safely', async () => {
+  const api = await loadApi(async (url) => {
+    return {
+      status: 204,
+      ok: true,
+      headers: { get: () => null }
+    };
+  });
+  const res = await api.fetchHealth();
+  assert.equal(res, null);
+});
+
+test('requestJson handles JSON FastAPI error with detail field safely', async () => {
+  const api = await loadApi(async (url) => {
+    return {
+      status: 400,
+      ok: false,
+      headers: { get: (name) => name.toLowerCase() === 'content-type' ? 'application/json' : null },
+      json: async () => ({ detail: 'Invalid inputs provided' })
+    };
+  });
+  await assert.rejects(
+    async () => await api.fetchHealth(),
+    /Invalid inputs provided/
+  );
+});
+
+test('requestJson handles plain-text 500 unhandled exceptions safely', async () => {
+  const api = await loadApi(async (url) => {
+    return {
+      status: 500,
+      ok: false,
+      headers: { get: () => 'text/html' },
+      text: async () => 'Internal Server Error'
+    };
+  });
+  await assert.rejects(
+    async () => await api.fetchHealth(),
+    /Internal Server Error/
+  );
+});
+
