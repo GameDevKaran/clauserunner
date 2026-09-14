@@ -61,7 +61,7 @@ class SQLiteObligation(SQLiteBase):
 
     def save_investigation(self, inv: Investigation) -> None:
         with self._get_connection() as conn:
-            steps_json = json.dumps([s.dict() for s in inv.steps])
+            steps_json = json.dumps([s.model_dump(mode="json") for s in inv.steps])
             conn.execute("INSERT OR REPLACE INTO investigations VALUES (?,?,?,?,?,?,?,?,?)", (inv.id, inv.obligation_id, inv.status, steps_json, inv.findings, inv.confidence, inv.proposed_action_id, inv.created_at.isoformat(), inv.completed_at.isoformat() if inv.completed_at else None))
             conn.commit()
 

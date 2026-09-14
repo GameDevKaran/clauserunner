@@ -61,12 +61,19 @@ class DynamoDBAction(DynamoDBBase):
     def save_audit_event(self, ev: AuditEvent) -> None:
         self._put_item(f"AUDIT#{ev.id}", "METADATA", ev.dict())
 
+    def _hydrate_audit(self, r) -> AuditEvent:
+        return AuditEvent(id=r["id"], contract_id=r["contract_id"], obligation_id=r.get("obligation_id"), action_type=r["action_type"], description=r["description"], user_or_system=r["user_or_system"], request_id=r.get("request_id"), timestamp=datetime.fromisoformat(r["timestamp"]), metadata=json.loads(r["metadata"]))
+
+    def get_audit_event(self, id: str) -> Optional[AuditEvent]:
+        r = self._get_item(f"AUDIT#{id}", "METADATA")
+        return self._hydrate_audit(r) if r else None
+
     def list_audit_events(self, obligation_id: Optional[str] = None) -> List[AuditEvent]:
         items = self._scan_by_sk("METADATA")
         auds = []
         for r in items:
             if r["PK"].startswith("AUDIT#"):
-                aud = AuditEvent(id=r["id"], contract_id=r["contract_id"], obligation_id=r.get("obligation_id"), action_type=r["action_type"], description=r["description"], user_or_system=r["user_or_system"], request_id=r.get("request_id"), timestamp=datetime.fromisoformat(r["timestamp"]), metadata=json.loads(r["metadata"]))
+                aud = self._hydrate_audit(r)
                 if not obligation_id or aud.obligation_id == obligation_id:
                     auds.append(aud)
         auds.sort(key=lambda x: x.timestamp, reverse=True)

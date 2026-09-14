@@ -2,15 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Shield, Calendar, Terminal, Clock } from 'lucide-react';
 import { fetchAuditEvents } from '../api';
 
+const PAGE_SIZE = 100;
+
 export default function AuditTrail() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     async function loadEvents() {
       try {
-        const data = await fetchAuditEvents();
+        const data = await fetchAuditEvents(undefined, PAGE_SIZE);
         setEvents(data);
+        setHasMore(data.length === PAGE_SIZE);
       } catch (e) {
         console.error(e);
       } finally {
@@ -19,6 +24,20 @@ export default function AuditTrail() {
     }
     loadEvents();
   }, []);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const data = await fetchAuditEvents(undefined, PAGE_SIZE, events.length);
+      const knownIds = new Set(events.map(event => event.id));
+      setEvents([...events, ...data.filter((event: any) => !knownIds.has(event.id))]);
+      setHasMore(data.length === PAGE_SIZE);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   if (loading) return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div></div>;
 
@@ -51,6 +70,19 @@ export default function AuditTrail() {
           ))
         )}
       </div>
+
+      {hasMore && (
+        <div className="max-w-4xl flex items-center justify-between text-[10px] text-slate-400">
+          <span>Showing {events.length} most recent events</span>
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-brand-600 font-bold disabled:text-slate-400"
+          >
+            {loadingMore ? 'Loading...' : 'Load 100 older events'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

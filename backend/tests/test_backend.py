@@ -9,6 +9,7 @@ from backend.services.engine import calculate_sla_remedy, evaluate_notice_window
 from backend.repositories.sqlite_repo import SQLiteRepository
 from backend.repositories.db import init_db, get_repo
 from backend.tools.write_tools import propose_action, request_approval, execute_approved_action
+from backend.agent.mock_agent import run_mock_investigation
 from backend.main import app
 
 # 1. Test Deterministic SLA calculations
@@ -185,6 +186,20 @@ def test_global_and_obligation_audit_endpoints():
     assert acme_event.id in {event["id"] for event in obligation_events}
     assert cyber_event.id not in {event["id"] for event in obligation_events}
 
+    first_page = client.get("/api/audit?limit=1")
+    second_page = client.get("/api/audit?limit=1&offset=1")
+    assert first_page.status_code == 200
+    assert second_page.status_code == 200
+    assert len(first_page.json()) == 1
+    assert len(second_page.json()) == 1
+    assert first_page.json()[0]["id"] != second_page.json()[0]["id"]
+
+    obligation_page = client.get(
+        "/api/obligations/clauserunner-obligation-acme-sla/audit?limit=1"
+    )
+    assert obligation_page.status_code == 200
+    assert len(obligation_page.json()) == 1
+
 
 # 6. Test Scheduled Checker Capability
 def test_scheduled_checker():
@@ -200,6 +215,60 @@ def test_scheduled_checker():
     sched_events = [a for a in audits if a.action_type == "scheduled_check"]
     assert len(sched_events) == 2
     assert "Scheduled check" in sched_events[0].description
+    assert all(event.user_or_system == "EventBridge Rule" for event in sched_events)
+
+    # Re-running an unchanged check must not grow the ledger with duplicates.
+    count_again = run_scheduled_check()
+    sched_events_again = [
+        a for a in repo.list_audit_events() if a.action_type == "scheduled_check"
+    ]
+    assert count_again == 2
+    assert len(sched_events_again) == 2
+
+
+@pytest.mark.asyncio
+async def test_golden_sla_workflow_is_repeatable_and_idempotent():
+    repo = init_db(":memory:")
+    client = TestClient(app)
+    obligation_id = "clauserunner-obligation-acme-sla"
+
+    # The intended fixture already includes 99.4% evidence but starts pre-investigation.
+    assert repo.get_obligation(obligation_id).status == ObligationStatus.EVIDENCE_REQUIRED
+    assert repo.list_evidence(obligation_id)[0].raw_data_summary["measured_uptime"] == 99.4
+
+    first_run = await run_mock_investigation(obligation_id)
+    assert "error" not in first_run
+    assert repo.get_obligation(obligation_id).status == ObligationStatus.APPROVAL_REQUIRED
+    assert len(repo.list_proposed_actions(obligation_id)) == 1
+    assert len(repo.list_approval_requests()) == 1
+
+    # A repeated click while approval is pending reuses the active action.
+    repeated_run = await run_mock_investigation(obligation_id)
+    assert repeated_run["reused_existing_action"] is True
+    assert len(repo.list_proposed_actions(obligation_id)) == 1
+    assert len(repo.list_approval_requests()) == 1
+
+    approval = repo.list_approval_requests()[0]
+    approve_response = client.post(
+        f"/api/approvals/{approval.id}/approve",
+        json={"approved_by": "Test Manager", "comments": "Verified."},
+    )
+    assert approve_response.status_code == 200
+
+    action = repo.list_proposed_actions(obligation_id)[0]
+    execute_response = client.post(
+        f"/api/actions/{action.id}/execute",
+        json={"executed_by": "Test Operator"},
+    )
+    assert execute_response.status_code == 200
+    assert repo.get_obligation(obligation_id).status == ObligationStatus.COMPLETED
+
+    # The periodic SLA can start a new clean cycle after completion.
+    second_cycle = await run_mock_investigation(obligation_id)
+    assert "error" not in second_cycle
+    assert repo.get_obligation(obligation_id).status == ObligationStatus.APPROVAL_REQUIRED
+    assert len(repo.list_proposed_actions(obligation_id)) == 2
+    assert len(repo.list_approval_requests()) == 2
 
 # 7. Test Bedrock Provider Fallback Logic
 def test_bedrock_provider_live_state():

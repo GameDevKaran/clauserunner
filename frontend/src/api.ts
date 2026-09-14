@@ -45,8 +45,13 @@ export async function attachEvidence(obligationId: string, payload: { name: stri
   return r.json();
 }
 
-export async function fetchAuditEvents(obligationId?: string) {
-  const url = obligationId ? `${API_BASE}/obligations/${obligationId}/audit` : `${API_BASE}/audit`;
+export async function fetchAuditEvents(obligationId?: string, limit?: number, offset = 0) {
+  const baseUrl = obligationId ? `${API_BASE}/obligations/${obligationId}/audit` : `${API_BASE}/audit`;
+  const query = [
+    limit !== undefined ? `limit=${limit}` : '',
+    offset > 0 ? `offset=${offset}` : ''
+  ].filter(Boolean).join('&');
+  const url = query ? `${baseUrl}?${query}` : baseUrl;
   const r = await fetch(url);
   return r.json();
 }

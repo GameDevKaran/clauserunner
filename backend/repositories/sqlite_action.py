@@ -78,6 +78,13 @@ class SQLiteAction(SQLiteBase):
             conn.execute("INSERT OR REPLACE INTO audit_events VALUES (?,?,?,?,?,?,?,?,?)", (ev.id, ev.contract_id, ev.obligation_id, ev.action_type, ev.description, ev.user_or_system, ev.request_id, ev.timestamp.isoformat(), json.dumps(ev.metadata)))
             conn.commit()
 
+    def get_audit_event(self, id: str) -> Optional[AuditEvent]:
+        with self._get_connection() as conn:
+            r = conn.execute("SELECT * FROM audit_events WHERE id = ?", (id,)).fetchone()
+            if not r:
+                return None
+            return AuditEvent(id=r["id"], contract_id=r["contract_id"], obligation_id=r["obligation_id"], action_type=r["action_type"], description=r["description"], user_or_system=r["user_or_system"], request_id=r["request_id"], timestamp=datetime.fromisoformat(r["timestamp"]), metadata=json.loads(r["metadata"]))
+
     def list_audit_events(self, obligation_id: Optional[str] = None) -> List[AuditEvent]:
         with self._get_connection() as conn:
             q = "SELECT * FROM audit_events WHERE obligation_id = ? ORDER BY timestamp DESC" if obligation_id else "SELECT * FROM audit_events ORDER BY timestamp DESC"

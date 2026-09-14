@@ -37,4 +37,5 @@ class StorageInterface:
     def get_action_execution(self, execution_id: str) -> Optional[ActionExecution]: raise NotImplementedError
     
     def save_audit_event(self, event: AuditEvent) -> None: raise NotImplementedError
+    def get_audit_event(self, event_id: str) -> Optional[AuditEvent]: raise NotImplementedError
     def list_audit_events(self, obligation_id: Optional[str] = None) -> List[AuditEvent]: raise NotImplementedError

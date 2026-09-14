@@ -88,18 +88,20 @@ def propose_action(obligation_id: str, title: str, description: str, action_type
         draft_payload={"recipient": recipient, "subject": subject, "body": body},
         status=ActionStatus.DRAFT
     )
-    repo.save_proposed_action(proposed_action)
 
     # Transition obligation state to ACTION_REQUIRED or APPROVAL_REQUIRED
     old_status = obligation.status
     target_status = ObligationStatus.APPROVAL_REQUIRED if requires_approval else ObligationStatus.ACTION_REQUIRED
     try:
         ObligationStateMachine.validate_transition(old_status, target_status)
-        obligation.status = target_status
-        obligation.updated_at = datetime.utcnow()
-        repo.save_obligation(obligation)
     except Exception as e:
         return {"error": f"State transition failed: {str(e)}"}
+
+    # Persist only after validation so a rejected transition cannot leave an orphan draft.
+    repo.save_proposed_action(proposed_action)
+    obligation.status = target_status
+    obligation.updated_at = datetime.utcnow()
+    repo.save_obligation(obligation)
 
     # Audit log
     audit_id = f"clauserunner-audit-{uuid.uuid4().hex[:8]}"
@@ -125,8 +127,9 @@ def request_approval(proposed_action_id: str, requested_by: str) -> Dict[str, An
     repo.save_approval_request(request)
 
     # Audit log
+    obligation = repo.get_obligation(action.obligation_id)
     repo.save_audit_event(AuditEvent(
-        id=f"clauserunner-audit-{uuid.uuid4().hex[:8]}", contract_id="unknown", obligation_id=action.obligation_id,
+        id=f"clauserunner-audit-{uuid.uuid4().hex[:8]}", contract_id=obligation.contract_id if obligation else "unknown", obligation_id=action.obligation_id,
         action_type="approval_requested", description=f"Requested human approval for action '{action.title}'.",
         user_or_system=requested_by
     ))

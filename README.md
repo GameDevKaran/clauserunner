@@ -8,7 +8,7 @@
 
 Once a contract is signed, it is often archived as a passive PDF. Critical operational obligations—such as monthly service level commitments (SLAs), automatic renewal notice windows, and SOC 2 submissions—are left unmonitored. 
 
-**ClauseRunner turns contracts into active operational code.** It persistently monitors compliance evidence, conducts autonomous investigations via Amazon Bedrock (testing with Nova 2 Lite while pending authorization) via Strands, maps violations to remedies, and prepares claim packages under strict deterministic code rules.
+**ClauseRunner turns contracts into active operational code.** It persistently monitors compliance evidence, runs investigations through a Strands Agents SDK implementation, maps violations to remedies, and prepares claim packages under strict deterministic code rules. The current public runtime uses the deterministic fallback while the coded Amazon Bedrock Nova 2 Lite path awaits account authorization.
 
 ---
 
@@ -17,7 +17,8 @@ Once a contract is signed, it is often archived as a passive PDF. Critical opera
 ```
 Web Interface (React/Vite) ◄──► FastAPI Backend ◄──► Strands Operations Agent 
                                                        │
-                                                       ├─► Amazon Bedrock (Nova 2 Lite)
+                                                       ├─► Deterministic fallback (live)
+                                                       ├─► Amazon Bedrock Nova 2 Lite (pending)
                                                        ├─► Storage Layer (SQLite/DynamoDB)
                                                        └─► Audit Trail (Immutability Ledger)
 ```
@@ -34,7 +35,7 @@ Web Interface (React/Vite) ◄──► FastAPI Backend ◄──► Strands Ope
 
 ## Local Setup & Quick Start
 
-Ensure you have Python 3.14.1+ and Node.js installed.
+Ensure you have Python 3.11+ and Node.js 20+ installed.
 
 ### 1. Backend Setup & Run
 ```powershell
@@ -72,7 +73,7 @@ BEDROCK_MODEL_ID=us.amazon.nova-2-lite-v1:0
 CLAUSERUNNER_S3_BUCKET=
 CLAUSERUNNER_DYNAMODB_TABLE=
 ```
-*Note: Amazon Bedrock integration and AgentCore runtimes are fully coded and prepared, but currently pending AWS account authorization (NOT_AUTHORIZED). We have successfully tested with the Amazon Nova 2 Lite model (amazon.nova-2-lite-v1:0 / us.amazon.nova-2-lite-v1:0) during authorization checks. Live inference is NOT currently verified since authorization is pending. In this state, ClauseRunner automatically degrades gracefully to a fully functional and deterministic **Local Mock Mode**, running all contract agentic loops, state machine changes, human-in-the-loop approvals, and audit events successfully.*
+*Note: The Amazon Bedrock provider integration targets Amazon Nova 2 Lite (`amazon.nova-2-lite-v1:0` / `us.amazon.nova-2-lite-v1:0`), but live inference remains unverified while account authorization is pending (`NOT_AUTHORIZED`). Amazon Bedrock AgentCore Runtime is also pending and is not part of the current execution path. The public application therefore reports and uses the tested Strands-based **Deterministic Mock Mode** for investigations, state changes, human approvals, and audit events.*
 
 ---
 
@@ -84,16 +85,17 @@ python -m pytest backend/tests -v
 
 # Run the frontend production compiler check
 cd frontend
+npm test
 npm run build
 ```
 
 ---
 
 ## AWS Services Used
-- **Amazon Bedrock**: Powering the Strands Agent loop via Amazon Nova 2 Lite (integration prepared, live inference pending active account authorization).
-- **Amazon S3**: For storing compliance documents and uptime log evidence.
+- **Amazon Bedrock**: The Strands provider targets Amazon Nova 2 Lite; live inference is pending active account authorization, so the public runtime uses the deterministic fallback.
+- **Amazon S3**: A private, encrypted artifact bucket is provisioned for compliance documents and evidence objects; the current demo fixture references evidence metadata from DynamoDB.
 - **Amazon DynamoDB**: Single-table design schema storing authoritative contract states and audit ledgers.
-- **Amazon EventBridge Scheduler**: Scheduled obligation checker for expiring notice deadlines.
+- **Amazon EventBridge**: Enabled scheduled rule and API Destination invoke the obligation checker for expiring notice deadlines.
 
 ---
 

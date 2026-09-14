@@ -1,7 +1,8 @@
 import os
+import uuid
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -94,12 +95,21 @@ def upload_obligation_evidence(id: str, payload: EvidenceCreate):
     return get_repo().get_evidence(res["id"])
 
 @app.get("/api/obligations/{id}/audit", response_model=List[AuditEvent])
-def get_obligation_audit(id: str):
-    return get_repo().list_audit_events(id)
+def get_obligation_audit(
+    id: str,
+    limit: Optional[int] = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    events = get_repo().list_audit_events(id)
+    return events[offset:] if limit is None else events[offset:offset + limit]
 
 @app.get("/api/audit", response_model=List[AuditEvent])
-def get_audit_events():
-    return get_repo().list_audit_events(None)
+def get_audit_events(
+    limit: Optional[int] = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    events = get_repo().list_audit_events(None)
+    return events[offset:] if limit is None else events[offset:offset + limit]
 
 @app.post("/api/obligations/{id}/investigate")
 async def trigger_investigation(id: str):
@@ -128,8 +138,9 @@ def approve_request(id: str, decision: ApprovalDecision):
         action.status = ActionStatus.APPROVED
         action.updated_at = datetime.utcnow()
         repo.save_proposed_action(action)
+        obligation = repo.get_obligation(action.obligation_id)
         repo.save_audit_event(AuditEvent(
-            id=f"audit-app-{id[:8]}", contract_id="unknown", obligation_id=action.obligation_id,
+            id=f"audit-app-{uuid.uuid4().hex[:8]}", contract_id=obligation.contract_id if obligation else "unknown", obligation_id=action.obligation_id,
             action_type="approval_granted", description=f"Human approved action: '{action.title}'. Comments: {decision.comments or ''}",
             user_or_system=decision.approved_by
         ))
@@ -151,8 +162,9 @@ def reject_request(id: str, decision: ApprovalDecision):
         action.status = ActionStatus.REJECTED
         action.updated_at = datetime.utcnow()
         repo.save_proposed_action(action)
+        obligation = repo.get_obligation(action.obligation_id)
         repo.save_audit_event(AuditEvent(
-            id=f"audit-rej-{id[:8]}", contract_id="unknown", obligation_id=action.obligation_id,
+            id=f"audit-rej-{uuid.uuid4().hex[:8]}", contract_id=obligation.contract_id if obligation else "unknown", obligation_id=action.obligation_id,
             action_type="approval_rejected", description=f"Human rejected action: '{action.title}'. Reason: {decision.comments or ''}",
             user_or_system=decision.approved_by
         ))

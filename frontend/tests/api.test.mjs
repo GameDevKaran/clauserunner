@@ -47,3 +47,20 @@ test('fetchAuditEvents preserves the obligation-specific endpoint', async () => 
     '/api/obligations/clauserunner-obligation-acme-sla/audit',
   ]);
 });
+
+test('fetchAuditEvents adds bounded pagination without malformed paths', async () => {
+  const urls = [];
+  const api = await loadApi(async (url) => {
+    urls.push(url);
+    return { json: async () => [] };
+  });
+
+  await api.fetchAuditEvents(undefined, 100);
+  await api.fetchAuditEvents('clauserunner-obligation-acme-sla', 100, 100);
+
+  assert.deepEqual(urls, [
+    '/api/audit?limit=100',
+    '/api/obligations/clauserunner-obligation-acme-sla/audit?limit=100&offset=100',
+  ]);
+  assert.ok(urls.every(url => !url.includes('/obligations//')));
+});

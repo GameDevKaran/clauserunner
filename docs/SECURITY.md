@@ -11,7 +11,7 @@ ClauseRunner strictly enforces a zero-tolerance policy against committing real c
 ### Protection Controls
 - **`.gitignore` Enforced**: `.env` and all other environmental variants (`.env.local`, `.env.development`) are explicitly ignored by Git. Only safe blank examples (`.env.example`) are tracked.
 - **Backend-Only Decoupling**: All administrative and runtime cloud interaction calls (such as Bedrock invocations via boto3 or Strands) occur strictly on the **server-side** (FastAPI). No AWS credentials, access tokens, or account IDs are ever exposed or served to the React frontend or compiled browser bundle.
-- **Sanitized Logging**: Standard logger configurations strictly filter and sanitize fields like `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and bearer headers to prevent them from leaking into AWS CloudWatch, local files, or console outputs.
+- **Structured Logging Guard**: The JSON formatter drops known sensitive keys such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `secret`, and `token` from structured `extra_fields`. Callers must never place credentials in free-form log messages.
 
 ---
 
@@ -26,7 +26,7 @@ ClauseRunner implements a hard **Human Approval Execution Boundary** directly in
 
 ## 3. Strict Naming Policy Prefix
 
-To guarantee that ClauseRunner cannot accidentally interfere with other unrelated projects or generic resources, all IAM roles, DynamoDB tables, S3 buckets, and EventBridge schedulers are provisioned with an unmistakable prefix:
+To guarantee that ClauseRunner cannot accidentally interfere with other unrelated projects or generic resources, all IAM roles, DynamoDB tables, S3 buckets, and EventBridge resources are provisioned with an unmistakable prefix:
 
 > `clauserunner-`
 

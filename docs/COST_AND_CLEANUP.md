@@ -1,6 +1,6 @@
 # ClauseRunner Cost and Cleanup Guide
 
-ClauseRunner is engineered to be serverless and extremely low cost, running on on-demand AWS serverless tiers (S3, DynamoDB, EventBridge) to ensure that the hackathon demo carries near-zero maintenance overhead.
+ClauseRunner uses managed AWS services and a single small ECS Express Mode task to keep the hackathon demo low maintenance. Actual charges depend on account credits, free-tier eligibility, storage, requests, data transfer, and task uptime.
 
 This guide details our cost profile and provides precise instructions for safe post-judging cleanup.
 
@@ -8,26 +8,25 @@ This guide details our cost profile and provides precise instructions for safe p
 
 ## 1. Cloud Cost Profile (us-east-1)
 
-- **Amazon S3**: Under standard storage tiers, our small evidence files and contracts cost less than **$0.01 per month**.
-- **Amazon DynamoDB**: Provisioned in on-demand mode (`PAY_PER_REQUEST`). Pricing scales strictly with actual operations, costing **$0.00** during idle periods.
-- **Amazon EventBridge Scheduler / Rule**: Pricing is serverless, offering **14 million free invocations per month**.
-- **Amazon ECR**: Repository storage carries zero-cost within the AWS Free Tier.
-- **Amazon ECS Express Mode**: Billed per task-hour for active containers, costing less than **$0.02 per hour** for standard micro task definitions.
+- **Amazon S3**: Storage, requests, and applicable transfer are billed by usage; the current artifact volume is small.
+- **Amazon DynamoDB**: The table uses `PAY_PER_REQUEST`, so there is no provisioned read/write capacity charge. Requests, storage, and optional features remain usage based and may be covered by account free-tier benefits.
+- **Amazon EventBridge**: The live resource is a scheduled EventBridge rule with an API Destination. Its five-minute cadence is low volume, but API Destination and transfer pricing still apply.
+- **Amazon ECR**: Private repository storage is usage based. Free-tier allowances are limited by eligibility, time, and stored volume, so zero cost is not guaranteed.
+- **Amazon ECS Express Mode**: The live service keeps one `256` CPU-unit, `512` MiB Fargate task running. Confirm the task, managed ingress, and related network charges in AWS Billing rather than relying on a fixed estimate.
 
 ---
 
 ## 2. Safe Post-Judging Cleanup Instructions
 
-To completely tear down all ClauseRunner-specific resources once judging is complete without affecting any unrelated operational environments, run the following commands sequentially using the authorized `clauserunner-dev` profile in `us-east-1`:
+The following commands target named ClauseRunner application resources after judging. Review the live inventory first and run them only when teardown is explicitly approved. IAM roles are intentionally excluded for separate account-owner review.
 
 ### A. Delete ECS Express Mode Service and Cluster
 ```powershell
-# Delete the active ECS Express Mode gateway service
-aws ecs delete-express-gateway-service --service-name clauserunner-web --profile clauserunner-dev --region us-east-1
-
-# Delete the ECS cluster
-aws ecs delete-cluster --cluster default --profile clauserunner-dev --region us-east-1
+# Delete only the named ECS Express Mode gateway service
+aws ecs delete-express-gateway-service --service-arn arn:aws:ecs:us-east-1:772097700032:service/default/clauserunner-web --profile clauserunner-dev --region us-east-1
 ```
+
+Do not delete the shared `default` ECS cluster as part of ClauseRunner cleanup.
 
 ### B. Remove S3 Evidence Bucket
 ```powershell

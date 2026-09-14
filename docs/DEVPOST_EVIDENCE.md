@@ -18,8 +18,8 @@ This document maps the major ClauseRunner product features and technical claims 
 - **Technical Proof**:
   - `backend/agent/strands_agent.py` instantiates `strands.models.BedrockModel` using the unpacked model configuration (`model_id` / Amazon Nova 2 Lite / `us.amazon.nova-2-lite-v1:0` on AWS Bedrock).
   - Uses `boto3` client checks (`client = boto3.client("bedrock", region_name=region)`) inside `is_bedrock_available()` to check for access capability.
-  - **OIDC/Authorization Status**: Bedrock integration and AgentCore runtimes are fully coded, but are currently marked as **PENDING AWS account authorization** (`authorizationStatus=NOT_AUTHORIZED`). Live inference is NOT verified. Only successful Converse/InvokeModel calls count as live Bedrock verification.
-  - **Tested Model**: The model selected for live authorization checks and configured as the target is **Amazon Nova 2 Lite** (`amazon.nova-2-lite-v1:0` / `us.amazon.nova-2-lite-v1:0`), NOT Claude 3.5 Sonnet.
+  - **Authorization Status**: Bedrock live inference is **PENDING AWS account authorization** (`authorizationStatus=NOT_AUTHORIZED`). AgentCore Runtime execution is also pending and is not in the live request path. Only a successful authorized runtime invocation counts as live verification.
+  - **Configured Model**: The model selected for authorization checks and configured as the target is **Amazon Nova 2 Lite** (`amazon.nova-2-lite-v1:0` / `us.amazon.nova-2-lite-v1:0`).
   - **Current Runtime Behavior**: While Bedrock authorization is pending, the application runs on the hosted ECS Express Mode container using its robust, deterministic, and fully validated **Local Mock Mode**, running all contract agentic loops, state machine changes, human-in-the-loop approvals, and audit events successfully with zero failures.
 
 ---
@@ -42,18 +42,18 @@ This document maps the major ClauseRunner product features and technical claims 
 ### Claim: "Immutable audit trail"
 - **Technical Proof**:
   - **Events logging**: Every state-changing tool call (evidence attached, action proposed, approval, execution) automatically commits an `AuditEvent` payload into the SQLite/DynamoDB table.
-  - **UI Visualization**: `frontend/src/views/AuditTrail.tsx` fetches and renders the unified timeline showing every single step with a timestamp.
+  - **UI Visualization**: `frontend/src/views/AuditTrail.tsx` renders the unified timeline in bounded pages of 100 events, with an explicit control to load the complete older history.
 
 
 ---
 
 ## 2. AWS Serverless Infrastructure Proofs
 
-### Claim: "Uses Amazon S3 for Evidence Storage"
+### Claim: "Provisioned Amazon S3 Evidence Artifact Bucket"
 - **Technical Proof**:
   - Bucket name: `clauserunner-contracts-772097700032-us-east-1`
-  - Evaluates file paths natively (e.g. `/s3/evidence/acme_march_2026.json`).
-  - S3 bucket creation, SSE default encryption, private-only access blocks, and programmatical write/read/delete capabilities have been verified successfully under our `clauserunner-dev` credentials.
+  - The live bucket is private, has public-access blocks enabled, and uses SSE-S3 default encryption.
+  - Current demo evidence metadata is persisted in DynamoDB and references artifact paths such as `/s3/evidence/acme_march_2026.json`; those fixture references must not be presented as proof that the corresponding evidence objects are currently stored in S3.
 
 ### Claim: "Uses Amazon DynamoDB for Contract State"
 - **Technical Proof**:
@@ -64,5 +64,5 @@ This document maps the major ClauseRunner product features and technical claims 
 ### Claim: "Uses EventBridge for Automated Obligation Checks"
 - **Technical Proof**:
   - Exposes endpoint `POST /api/obligations/check-all` which is called programmatically by Amazon EventBridge Rule `clauserunner-obligation-check` targeting API Destination `clauserunner-api-destination`.
-  - Core checker logic implemented in `backend/services/checker.py` evaluates upcoming renewal deadlines and SLA log completions deterministically, generating immutable audit events in DynamoDB.
+  - Core checker logic implemented in `backend/services/checker.py` evaluates upcoming renewal deadlines and SLA log completions deterministically. Repeated unchanged five-minute checks reuse a deterministic event identity, preventing duplicate-ledger growth while still recording changed state or daily countdown results.
 

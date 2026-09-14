@@ -30,9 +30,9 @@ def is_bedrock_available() -> bool:
         return False
 
 async def run_live_investigation(obligation_id: str) -> Dict[str, Any]:
-    """Runs a live Strands Agent loop on AWS Bedrock using Claude 3.5 Sonnet."""
+    """Runs a live Strands Agent loop on AWS Bedrock using Amazon Nova 2 Lite."""
     region = os.environ.get("AWS_REGION", "us-east-1")
-    model_id = os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-sonnet-20241022-v2:0")
+    model_id = os.environ.get("BEDROCK_MODEL_ID", "us.amazon.nova-2-lite-v1:0")
     
     model = BedrockModel(model_id=model_id, region_name=region)
     system_prompt = (

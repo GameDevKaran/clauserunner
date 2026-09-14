@@ -33,7 +33,8 @@ FastAPI Operations Server
        ├─► Deterministic Business Logic (SLA & Renewal Engines)
        │
        └─► Strands Agent Runtime
-            ├─► Amazon Bedrock (Claude 3.5 Sonnet Provider)
+            ├─► Deterministic fallback (current public runtime)
+            ├─► Amazon Bedrock Nova 2 Lite (pending authorization)
             └─► ClauseRunner Tools (Enforcing Code-Level Human Approval Policy)
 ```
 
@@ -53,7 +54,8 @@ FastAPI Operations Server
 
 ### C. Strands Agentic Loop
 - Built using the **Strands Agents SDK**.
-- Uses `BedrockModel` to bind to Claude 3.5 Sonnet on AWS Bedrock.
+- Uses `BedrockModel` to target Amazon Nova 2 Lite on AWS Bedrock; live inference remains pending account authorization.
+- Routes to the deterministic Strands workflow in the current public runtime and reports that mode through `/health`.
 - Invokes a tool list (`ALL_TOOLS`) to interact with obligations, retrieve text, and calculate numbers.
 - Safe operational logs: The UI displays structured tool step outputs (`get_obligation`, `evaluate_numeric_threshold`) rather than exposing raw prompt thinking, guaranteeing user confidence and clean UX.
 
@@ -64,7 +66,8 @@ FastAPI Operations Server
 
 ### E. Storage Repository Abstraction
 - Unified interface `StorageInterface` allows 100% credential-free local execution using **SQLite** with complete seeding of golden demo records.
-- Ready for multi-table or single-table **Amazon DynamoDB** and **S3** adapters behind the identical repository interface.
+- Uses **Amazon DynamoDB** as the authoritative production repository and SQLite for credential-free local development. The provisioned S3 bucket is reserved for evidence artifacts referenced by repository records.
 
-### F. Amazon EventBridge Scheduler (Future Cloud Capability)
-- Designed to run scheduled checks on approaching deadlines (such as renewal notices) so they trigger obligations autonomously without waiting for a user to log in.
+### F. Amazon EventBridge Scheduled Rule (Live)
+- The enabled `clauserunner-obligation-check` rule invokes the production checking endpoint through an API Destination every five minutes.
+- Identical unchanged observations are deduplicated, while state changes and daily deadline countdown changes create new audit events.

@@ -9,16 +9,19 @@ export default function ObligationDetail({ obligationId, onNavigate }: { obligat
   const [audits, setAudits] = useState<any[]>([]);
   const [investigating, setInvestigating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadAll = async () => {
     try {
+      setError(null);
       const [obData, evData, actData, auditData] = await Promise.all([
         fetchObligation(obligationId), fetchEvidence(obligationId),
-        fetchProposedActions(obligationId), fetchAuditEvents(obligationId)
+        fetchProposedActions(obligationId), fetchAuditEvents(obligationId, 100)
       ]);
       setOb(obData); setEvList(evData); setActions(actData); setAudits(auditData);
     } catch (e) {
       console.error(e);
+      setError(e instanceof Error ? e.message : 'Unable to load the obligation.');
     } finally {
       setLoading(false);
     }
@@ -39,9 +42,18 @@ export default function ObligationDetail({ obligationId, onNavigate }: { obligat
 
   const handleInvestigate = async () => {
     setInvestigating(true);
-    await triggerInvestigation(obligationId);
-    await loadAll();
-    setInvestigating(false);
+    try {
+      const result = await triggerInvestigation(obligationId);
+      if (result.error || result.detail) {
+        throw new Error(result.error || result.detail);
+      }
+      await loadAll();
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : 'Investigation failed.');
+    } finally {
+      setInvestigating(false);
+    }
   };
 
   const handleExecute = async (actionId: string) => {
@@ -50,6 +62,27 @@ export default function ObligationDetail({ obligationId, onNavigate }: { obligat
     if (r.error) alert(r.error);
     await loadAll();
   };
+
+  if (loading) return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div></div>;
+
+  if (!ob) {
+    return (
+      <div className="flex items-center justify-center h-full p-6 text-center">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 max-w-md">
+          <h2 className="text-sm font-bold text-slate-800">Unable to load obligation</h2>
+          <p className="text-xs text-rose-600 mt-2">{error || 'The obligation was not found.'}</p>
+          <button onClick={() => onNavigate('dashboard')} className="text-xs text-brand-600 font-bold mt-4 hover:underline">Return to Dashboard</button>
+        </div>
+      </div>
+    );
+  }
+
+  const investigationBlocked = ['approval_required', 'action_required'].includes(ob.status);
+  const visibleActions = [...actions]
+    .filter(action => ob.status !== 'completed' || action.status === 'executed')
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 1);
+
   return (
     <div className="h-full flex divide-x divide-slate-100 overflow-hidden">
       {/* Left Panel */}
@@ -60,6 +93,12 @@ export default function ObligationDetail({ obligationId, onNavigate }: { obligat
           <h1 className="text-lg font-bold text-slate-800 mt-1">{ob.title}</h1>
           <p className="text-xs text-slate-500 mt-1">{ob.description}</p>
         </div>
+
+        {error && (
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-lg p-3 text-xs">
+            {error}
+          </div>
+        )}
 
         <div className="bg-white p-4 rounded-xl border space-y-1.5 text-xs">
           <h3 className="font-bold text-slate-800">Operational Policy Criteria</h3>
@@ -92,8 +131,8 @@ export default function ObligationDetail({ obligationId, onNavigate }: { obligat
             <h3 className="text-xs font-bold text-slate-300 flex items-center"><Shield size={14} className="mr-1 text-brand-500" /> Strands Investigation Agent</h3>
             <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">Autonomous analysis loop. Inspects contract clauses, calculates SLA logs, and drafts remedy actions under code policy.</p>
           </div>
-          <button onClick={handleInvestigate} disabled={evList.length === 0 || investigating} className="w-full py-2 bg-brand-500 hover:bg-brand-600 text-white disabled:bg-slate-800 disabled:text-slate-600 rounded-lg text-xs font-bold flex items-center justify-center">
-            {investigating ? 'Running agent...' : 'Trigger Strands Investigation'} <Play size={10} className="ml-1 fill-white" />
+          <button onClick={handleInvestigate} disabled={evList.length === 0 || investigating || investigationBlocked} className="w-full py-2 bg-brand-500 hover:bg-brand-600 text-white disabled:bg-slate-800 disabled:text-slate-600 rounded-lg text-xs font-bold flex items-center justify-center">
+            {investigating ? 'Running agent...' : investigationBlocked ? 'Awaiting Human Decision' : 'Trigger Strands Investigation'} <Play size={10} className="ml-1 fill-white" />
           </button>
         </div>
       </div>
@@ -102,10 +141,10 @@ export default function ObligationDetail({ obligationId, onNavigate }: { obligat
       <div className="flex-1 overflow-y-auto h-full p-6 space-y-5 bg-white">
         <h2 className="text-xs font-bold text-slate-400 uppercase font-bold tracking-wider">Action & Audit Center</h2>
 
-        {actions.length > 0 && (
+        {visibleActions.length > 0 && (
           <div className="p-4 bg-slate-50 rounded-xl border space-y-3 border-brand-100">
             <h3 className="text-xs font-bold text-brand-800">Proposed Remedy Claim Draft</h3>
-            {actions.map(a => (
+            {visibleActions.map(a => (
               <div key={a.id} className="space-y-2 text-xs">
                 <div className="bg-white p-3 rounded border text-[10px] space-y-1">
                   <p><span className="text-slate-400 font-semibold">Recipient:</span> <span className="text-slate-800">{a.draft_payload?.recipient}</span></p>

@@ -1,88 +1,64 @@
-# ClauseRunner AWS Deployment & Infrastructure Guide
+# ClauseRunner AWS Deployment and Infrastructure Guide
 
-This guide details how to package, deploy, and host ClauseRunner on Amazon Web Services (AWS) using industry standard cloud-native designs.
-
----
-
-## 1. Deployed AWS Architecture Overview
-
-```
-Frontend Assets (S3) ──► Amazon CloudFront (HTTPS Content Delivery Network)
-                                  │
-                                  ▼
-FastAPI Backend (AWS App Runner / ECS Fargate)
-                                  │
-         ┌────────────────────────┴────────────────────────┐
-         ▼                                                 ▼
-S3 Evidence Bucket (Artifacts)               DynamoDB Single-Table (State)
-`clauserunner-evidence-...`                  `clauserunner-state-...`
-```
+This guide records the deployment that is actually used by the public ClauseRunner demo.
 
 ---
 
-## 2. Mandatory Naming Naming Policies & Safety
+## 1. Deployed Architecture
 
-To prevent accidental interactions with other AWS accounts or unrelated client environments, **all ClauseRunner cloud resources MUST use an unmistakable prefix**:
+```text
+Public HTTPS endpoint
+        |
+        v
+Amazon ECS Express Mode (`default/clauserunner-web`, Fargate)
+        |
+        +-- Unified FastAPI API and compiled React/Vite assets
+        +-- Amazon DynamoDB `clauserunner-state` (authoritative state)
+        +-- Amazon S3 `clauserunner-contracts-772097700032-us-east-1` (artifact bucket)
+        +-- Amazon CloudWatch Logs `/aws/ecs/default/clauserunner-web-2ef5`
 
-> `clauserunner-`
+Amazon EventBridge `clauserunner-obligation-check`
+        +-- API Destination -> POST `/api/obligations/check-all`
 
-### Examples
-- **Amazon S3 Buckets**: `clauserunner-contracts-evidence-[account-id]`
-- **Amazon DynamoDB Tables**: `clauserunner-state-[environment]`
-- **Amazon EventBridge Schedules**: `clauserunner-events-checking`
-- **IAM Policies / Roles**: `clauserunner-runtime-execution-role`
+GitHub Actions (OIDC) -> Amazon ECR `clauserunner-web` -> ECS rollout
+```
+
+The live URL is:
+
+`https://cl-a7d669f525024e6a8413b2e0f7b851c8.ecs.us-east-1.on.aws/`
+
+The frontend is not deployed through a separate S3 website, CloudFront distribution, or App Runner service. The ECS container serves both the API and compiled SPA assets.
 
 ---
 
-## 3. Storage Adapters (DynamoDB & S3)
+## 2. Resource Naming and Safety
 
-ClauseRunner's repository layer is abstracted behind `StorageInterface` to support seamless database swapping.
+ClauseRunner resources use the `clauserunner-` prefix and live in `us-east-1`. Release verification uses the `clauserunner-dev` profile and never the AWS root profile.
 
-### DynamoDB Schema
-For AWS, we map all tables (Contracts, Clauses, Obligations, Actions, Approvals, Executions, Audit Logs) into a single, high-performance table `clauserunner-state` utilizing a **Single-Table Design**:
-- **Partition Key (PK)**: `CONTRACT#[id]` or `OBLIGATION#[id]` or `APPROVAL#[id]`
-- **Sort Key (SK)**: `METADATA` or `CLAUSE#[id]` or `AUDIT#[timestamp]`
+Current resource identifiers are listed in [AWS_RESOURCES.md](AWS_RESOURCES.md). Do not create replacement resources merely to roll out a new application image.
 
 ---
 
-## 4. Deployed Hosting Environments
+## 3. DynamoDB Repository
 
-### A. Frontend Hosting
-The React + TS + Vite production build (`dist/` folder) is uploaded to an **Amazon S3** bucket configured for static web hosting and served securely using **Amazon CloudFront** with a custom SSL certificate:
-```powershell
-aws s3 sync frontend/dist s3://clauserunner-web-hosting-bucket/ --delete
-```
+Production uses the `clauserunner-state` table in `PAY_PER_REQUEST` mode. Every record has `SK = METADATA`; `PK` prefixes distinguish `CONTRACT#`, `CLAUSE#`, `OBLIGATION#`, `EVIDENCE#`, `INVESTIGATION#`, `ACTION#`, `APPROVAL#`, `EXECUTION#`, and `AUDIT#` records.
 
-### B. FastAPI Backend Hosting
-The Python backend is packaged as a Docker container and deployed to **AWS App Runner** or **Amazon ECS Fargate**. 
-
-Dockerfile structure:
-```dockerfile
-FROM python:3.14-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt --prefer-binary
-COPY . .
-EXPOSE 8000
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
+SQLite implements the same repository interface for local development and tests. It is not the database reported by the public deployment.
 
 ---
 
-## 5. Amazon Bedrock Access
-Ensure that Bedrock model access is enabled on your AWS console for the Anthropic Claude 3.5 Sonnet model. The deployed backend service must be attached to an IAM execution role containing Bedrock invocation policies:
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "bedrock:InvokeModel",
-        "bedrock:InvokeModelWithResponseStream"
-      ],
-      "Resource": "arn:aws:bedrock:*::foundation-model/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
-    }
-  ]
-}
-```
+## 4. Build and Rollout
+
+Pushes to `main` run the repository CI workflow and the ECR image workflow. GitHub Actions obtains temporary AWS credentials through OIDC by assuming `clauserunner-github-actions-role`; no long-lived AWS keys are stored in the repository.
+
+The workflow builds the repository `Dockerfile`, compiles the React application, and pushes `clauserunner-web:latest` to ECR. The existing ECS Express Mode service is then rolled forward to resolve that image. A release does not require local Docker and must not create another service, cluster, load balancer, or hosting stack.
+
+After rollout, verify `/health`, the public UI, the Golden SLA route, and `/api/audit?limit=100` before recording.
+
+---
+
+## 5. Bedrock and AgentCore Status
+
+The Strands implementation targets Amazon Nova 2 Lite through `BedrockModel`, but live Amazon Bedrock inference remains pending AWS account authorization. The public runtime truthfully reports `strands_deterministic_mock` and `bedrock_configured=false`.
+
+Amazon Bedrock AgentCore Runtime execution is also pending and is not part of the live request path. Do not describe either service as live until a successful authorized runtime invocation has been verified.

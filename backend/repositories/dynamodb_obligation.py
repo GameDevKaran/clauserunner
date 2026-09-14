@@ -52,7 +52,7 @@ class DynamoDBObligation(DynamoDBBase):
         return [e for e in evs if not obligation_id or e.obligation_id == obligation_id]
 
     def save_investigation(self, inv: Investigation) -> None:
-        self._put_item(f"INVESTIGATION#{inv.id}", "METADATA", inv.dict())
+        self._put_item(f"INVESTIGATION#{inv.id}", "METADATA", inv.model_dump(mode="json"))
 
     def get_investigation(self, id: str) -> Optional[Investigation]:
         r = self._get_item(f"INVESTIGATION#{id}", "METADATA")
