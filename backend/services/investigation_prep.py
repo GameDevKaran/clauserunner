@@ -15,12 +15,30 @@ def prepare_investigation_cycle(obligation_id: str) -> Tuple[Optional[Obligation
     if not obligation:
         return None, None, f"Obligation '{obligation_id}' not found."
 
+    # Active workflow statuses where we allow reusing existing actions
+    active_workflow_statuses = {
+        ObligationStatus.INVESTIGATING,
+        ObligationStatus.APPROVAL_REQUIRED,
+        ObligationStatus.ACTION_REQUIRED
+    }
+
     # 1. Inspect existing proposed actions
     actions = repo.list_proposed_actions(obligation_id)
-    active_actions = [
-        a for a in actions
-        if a.status in {ActionStatus.DRAFT, ActionStatus.APPROVED}
-    ]
+    active_actions = []
+    
+    if obligation.status in active_workflow_statuses:
+        # Search for the most recent "investigation_started" audit event to determine current cycle
+        audits = repo.list_audit_events(obligation_id)
+        last_reset_dt = None
+        for a in audits:
+            if a.action_type == "investigation_started":
+                last_reset_dt = a.timestamp
+                break
+                
+        for a in actions:
+            if a.status in {ActionStatus.DRAFT, ActionStatus.APPROVED}:
+                if last_reset_dt is None or a.created_at >= last_reset_dt:
+                    active_actions.append(a)
     
     # 2. If an active DRAFT or APPROVED action exists, reuse it and do not restart the cycle
     if active_actions:

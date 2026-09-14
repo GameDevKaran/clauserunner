@@ -488,3 +488,103 @@ async def test_live_bedrock_postconditions_and_guards(monkeypatch):
     assert "incorrect final status" in res["error"]
 
 
+# 15. Regression test: Stale approved action blocks new Golden SLA cycle
+@pytest.mark.asyncio
+async def test_regression_stale_approved_action_blocks_new_golden_sla_cycle():
+    repo = init_db(":memory:")
+    client = TestClient(app)
+    obligation_id = "clauserunner-obligation-acme-sla"
+
+    # 1. seed Golden SLA - The seed_demo_data or default setup includes Acme SLA
+    from backend.repositories.seed import seed_demo_data
+    seed_demo_data(repo)
+
+    # 2. complete one full cycle
+    # Run the investigation
+    res1 = await run_mock_investigation(obligation_id)
+    assert "error" not in res1
+    
+    # Verify we transitioned to APPROVAL_REQUIRED
+    assert repo.get_obligation(obligation_id).status == ObligationStatus.APPROVAL_REQUIRED
+    
+    # Get the proposed action & approval request
+    actions_cycle1 = repo.list_proposed_actions(obligation_id)
+    assert len(actions_cycle1) == 1
+    action_1 = actions_cycle1[0]
+    
+    approvals_cycle1 = repo.list_approval_requests()
+    assert len(approvals_cycle1) == 1
+    approval_1 = approvals_cycle1[0]
+    assert approval_1.status == ApprovalStatus.PENDING
+
+    # Approve it
+    approve_response = client.post(
+        f"/api/approvals/{approval_1.id}/approve",
+        json={"approved_by": "Test Manager", "comments": "Approved"},
+    )
+    assert approve_response.status_code == 200
+    
+    # 3. leave historical APPROVED approval records intact
+    # We approved it, so the approval status is APPROVED.
+    # Set the obligation status to COMPLETED directly to simulate a completed cycle.
+    ob = repo.get_obligation(obligation_id)
+    ob.status = ObligationStatus.COMPLETED
+    repo.save_obligation(ob)
+    
+    # Verify preconditions:
+    # - Acme SLA is COMPLETED
+    # - ProposedAction is in APPROVED status
+    # - ApprovalRequest is in APPROVED status
+    assert repo.get_obligation(obligation_id).status == ObligationStatus.COMPLETED
+    assert repo.get_proposed_action(action_1.id).status == ActionStatus.APPROVED
+    assert repo.list_approval_requests()[0].status == ApprovalStatus.APPROVED
+
+    # 5. trigger investigation again
+    res2 = client.post(f"/api/obligations/{obligation_id}/investigate")
+    
+    # 6. verify HTTP 200
+    assert res2.status_code == 200
+    
+    # 7. verify NEW proposed action is created
+    actions_cycle2 = repo.list_proposed_actions(obligation_id)
+    # Total actions should be 2 now (historical APPROVED action + new DRAFT action)
+    assert len(actions_cycle2) == 2
+    
+    # Find the new action
+    new_action = next(a for a in actions_cycle2 if a.id != action_1.id)
+    assert new_action.status == ActionStatus.DRAFT
+    
+    # 8. verify NEW PENDING approval is created
+    # 9. verify historical APPROVED approvals remain
+    approvals_all = repo.list_approval_requests()
+    assert len(approvals_all) == 2
+    
+    hist_approval = next(a for a in approvals_all if a.id == approval_1.id)
+    new_approval = next(a for a in approvals_all if a.id != approval_1.id)
+    
+    assert hist_approval.status == ApprovalStatus.APPROVED
+    assert new_approval.status == ApprovalStatus.PENDING
+    assert new_approval.proposed_action_id == new_action.id
+    
+    # 10. verify exactly one pending approval for the new cycle
+    pending_approvals = [a for a in approvals_all if a.status == ApprovalStatus.PENDING]
+    assert len(pending_approvals) == 1
+    
+    # 11. verify second immediate trigger reuses ONLY the new current-cycle pending action
+    res3 = client.post(f"/api/obligations/{obligation_id}/investigate")
+    assert res3.status_code == 200
+    
+    # Total proposed actions should still be 2 (no duplicate action created)
+    actions_cycle3 = repo.list_proposed_actions(obligation_id)
+    assert len(actions_cycle3) == 2
+    
+    # Total approval requests should still be 2
+    approvals_cycle3 = repo.list_approval_requests()
+    assert len(approvals_cycle3) == 2
+    
+    # 12. verify no duplicate pending approvals
+    pending_approvals_3 = [a for a in approvals_cycle3 if a.status == ApprovalStatus.PENDING]
+    assert len(pending_approvals_3) == 1
+
+
+

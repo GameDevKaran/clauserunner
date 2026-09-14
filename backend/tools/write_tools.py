@@ -70,8 +70,28 @@ def propose_action(obligation_id: str, title: str, description: str, action_type
     repo = get_repo()
     obligation = repo.get_obligation(obligation_id)
     if not obligation: return {"error": f"Obligation '{obligation_id}' not found."}
-    actions = repo.list_proposed_actions(obligation_id)
-    active_actions = [a for a in actions if a.action_type == ActionType(action_type) and a.status in {ActionStatus.DRAFT, ActionStatus.APPROVED}]
+    # Check active workflow status before reusing actions
+    active_workflow_statuses = {
+        ObligationStatus.INVESTIGATING,
+        ObligationStatus.APPROVAL_REQUIRED,
+        ObligationStatus.ACTION_REQUIRED
+    }
+    
+    active_actions = []
+    if obligation.status in active_workflow_statuses:
+        actions = repo.list_proposed_actions(obligation_id)
+        audits = repo.list_audit_events(obligation_id)
+        last_reset_dt = None
+        for au in audits:
+            if au.action_type == "investigation_started":
+                last_reset_dt = au.timestamp
+                break
+                
+        for a in actions:
+            if a.action_type == ActionType(action_type) and a.status in {ActionStatus.DRAFT, ActionStatus.APPROVED}:
+                if last_reset_dt is None or a.created_at >= last_reset_dt:
+                    active_actions.append(a)
+                    
     if active_actions:
         res = active_actions[0].model_dump(mode="json")
         res["reused_existing_action"] = True
