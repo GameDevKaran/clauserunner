@@ -154,10 +154,10 @@ async def run_mock_investigation(obligation_id: str) -> Dict[str, Any]:
         from backend.tools.write_tools import propose_action, request_approval
         from backend.services.engine import evaluate_notice_window
         eval_result = evaluate_notice_window(
-            obligation.deadline,
+            obligation.effective_until,
             current_time=datetime.now(timezone.utc).replace(tzinfo=None),
         )
-        steps.append(ToolExecution(tool_name="evaluate_notice_window", inputs={"expiration_date": obligation.deadline.isoformat()}, outputs={k: str(v) if isinstance(v, datetime) else v for k, v in eval_result.items()}))
+        steps.append(ToolExecution(tool_name="evaluate_notice_window", inputs={"expiration_date": obligation.effective_until.isoformat()}, outputs={k: str(v) if isinstance(v, datetime) else v for k, v in eval_result.items()}))
 
         action_result = propose_action(
             obligation_id=obligation_id,

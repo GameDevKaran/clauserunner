@@ -1,6 +1,7 @@
 import os
+import re
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from backend.domain.models import AuditEvent, ObligationStatus, ObligationType, ApprovalStatus, ActionStatus
@@ -216,6 +217,15 @@ def test_scheduled_checker():
     assert len(sched_events) == 2
     assert "Scheduled check" in sched_events[0].description
     assert all(event.user_or_system == "EventBridge Rule" for event in sched_events)
+
+    renewal = repo.get_obligation("clauserunner-obligation-cyber-renewal")
+    renewal_event = next(event for event in sched_events if event.obligation_id == renewal.id)
+    reported_days = int(re.search(r"is (-?\d+) days away", renewal_event.description).group(1))
+    expected_days = (
+        renewal.deadline - datetime.now(timezone.utc).replace(tzinfo=None)
+    ).days
+    assert reported_days in {expected_days, expected_days - 1}
+    assert f"({renewal.deadline.date()})" in renewal_event.description
 
     # Re-running an unchanged check must not grow the ledger with duplicates.
     count_again = run_scheduled_check()

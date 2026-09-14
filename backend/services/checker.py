@@ -22,7 +22,7 @@ def run_scheduled_check() -> int:
         checked_count += 1
         if ob.obligation_type.value == "renewal" and ob.status == ObligationStatus.MONITORING:
             # Evaluate renewal window
-            res = evaluate_notice_window(ob.deadline, current_time=current_time)
+            res = evaluate_notice_window(ob.effective_until, current_time=current_time)
             days = res["days_until_deadline"]
             msg = f"Scheduled check: Obligation '{ob.title}' is {days} days away from notice deadline ({ob.deadline.date()}). Status: {res['status'].upper()}."
             
